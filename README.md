@@ -4,22 +4,61 @@ Formally verified business logic verification. Checks that your functions preser
 
 The Lean proofs guarantee that if the function representation is faithful, the verification question sent to Z3 is semantics-preserving.
 
-## Quick start
+## Install
 
 ### Prerequisites
 
-- **Lean 4** (v4.28.0) — install via [elan](https://github.com/leanprover/elan) (macOS / Linux / Windows)
-- **Z3** — `brew install z3` (macOS) / `apt install z3` (Ubuntu) / [GitHub releases](https://github.com/Z3Prover/z3/releases) (Windows / all platforms)
+- **Z3** — `brew install z3` (macOS) / `apt install z3` (Ubuntu) / [GitHub releases](https://github.com/Z3Prover/z3/releases) (all platforms)
 
-### Build
+### Option A: Download a pre-built binary
+
+Grab the latest binary for your platform from [GitHub Releases](https://github.com/andremiguelc/ephemaral/releases/latest) and place it in your project's `.ephemaral/bin/` directory:
+
+```bash
+mkdir -p .ephemaral/bin
+
+# macOS (Apple Silicon)
+curl -L -o .ephemaral/bin/ephemaral https://github.com/andremiguelc/ephemaral/releases/latest/download/ephemaral-macos-arm64
+
+# macOS (Intel)
+curl -L -o .ephemaral/bin/ephemaral https://github.com/andremiguelc/ephemaral/releases/latest/download/ephemaral-macos-x86_64
+
+# Linux (x86_64)
+curl -L -o .ephemaral/bin/ephemaral https://github.com/andremiguelc/ephemaral/releases/latest/download/ephemaral-linux-x86_64
+
+chmod +x .ephemaral/bin/ephemaral
+```
+
+Add `.ephemaral/bin/` to your `.gitignore`.
+
+### Option B: Build from source
+
+Requires **Lean 4** (v4.28.0) via [elan](https://github.com/leanprover/elan).
 
 ```bash
 git clone https://github.com/andremiguelc/ephemaral.git
 cd ephemaral/proofs
 lake build ephemaral
+# Binary at: proofs/.lake/build/bin/ephemaral
 ```
 
-The binary lands at `proofs/.lake/build/bin/ephemaral`.
+### The .ephemaral directory
+
+When using ephemaral in a project, the `.ephemaral/` directory holds all verification artifacts:
+
+```
+.ephemaral/
+├── bin/
+│   └── ephemaral               # binary (gitignored)
+├── parsed/                     # parser output (gitignored, regenerable)
+│   └── withdraw.aral-fn.json
+└── rules/                      # invariant files (checked in)
+    └── account.aral
+```
+
+- **bin/** — the ephemaral binary. Gitignore this.
+- **parsed/** — `.aral-fn.json` files produced by parsers. Gitignore this (regenerable from source).
+- **rules/** — `.aral` invariant files. Check these in — they're your business rules.
 
 ## Usage
 
