@@ -1,0 +1,3 @@
+# Balance must be non-negative (but no rule on dailyWithdrawLimit)
+invariant balance_non_negative:
+  account.balance >= 0

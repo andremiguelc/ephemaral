@@ -1,0 +1,12 @@
+{
+  "name": "confirmOrder",
+  "inputType": "Order",
+  "inputFields": ["status"],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "status",
+      "value": { "lit": 1 }
+    }
+  ]
+}

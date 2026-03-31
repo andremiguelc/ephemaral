@@ -1,0 +1,3 @@
+# Total must equal subtotal
+invariant total_equals_subtotal:
+  order.total == order.subtotal

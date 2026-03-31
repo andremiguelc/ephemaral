@@ -1,0 +1,3 @@
+# Total must be between 0 and 10000
+invariant bounded_total:
+  order.total >= 0 and order.total <= 10000

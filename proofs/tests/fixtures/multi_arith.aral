@@ -1,0 +1,3 @@
+# Multi-term arithmetic: total = subtotal + tax - discount
+invariant total_equals_components:
+  order.total == order.subtotal + order.tax - order.discount

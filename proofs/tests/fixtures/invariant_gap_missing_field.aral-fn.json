@@ -1,0 +1,19 @@
+{
+  "name": "copyLimit",
+  "inputType": "Account",
+  "inputFields": [
+    "balance",
+    "dailyWithdrawLimit"
+  ],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "balance",
+      "value": {
+        "field": {
+          "name": "dailyWithdrawLimit"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+# Balance must be between 0 and 10000
+invariant balance_bounded:
+  account.balance >= 0 and account.balance <= 10000

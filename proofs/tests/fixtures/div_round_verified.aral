@@ -1,0 +1,7 @@
+# Tax must be non-negative (10% of subtotal, floored)
+invariant tax_non_negative:
+  order.tax >= 0
+
+# Subtotal must be non-negative
+invariant subtotal_non_negative:
+  order.subtotal >= 0

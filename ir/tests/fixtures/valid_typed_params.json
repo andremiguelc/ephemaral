@@ -1,0 +1,37 @@
+{
+  "name": "applyDiscountTyped",
+  "inputType": "Order",
+  "inputFields": [
+    "total",
+    "subtotal"
+  ],
+  "params": [
+    "discountAmount"
+  ],
+  "typedParams": [
+    {
+      "name": "discountAmount",
+      "type": "Discount"
+    }
+  ],
+  "assigns": [
+    {
+      "fieldName": "total",
+      "value": {
+        "arith": {
+          "op": "sub",
+          "left": {
+            "field": {
+              "name": "subtotal"
+            }
+          },
+          "right": {
+            "field": {
+              "name": "discountAmount"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

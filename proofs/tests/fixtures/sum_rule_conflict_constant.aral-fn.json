@@ -1,0 +1,9 @@
+{
+  "name": "resetTotal",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": [],
+  "assigns": [
+    {"fieldName": "total", "value": {"lit": 0}}
+  ]
+}

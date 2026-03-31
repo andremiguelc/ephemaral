@@ -1,0 +1,3 @@
+# Total must differ from zero
+invariant total_nonzero:
+  order.total != 0

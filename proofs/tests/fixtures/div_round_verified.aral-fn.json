@@ -1,0 +1,23 @@
+{
+  "name": "computeTaxRate",
+  "inputType": "Order",
+  "inputFields": ["tax", "subtotal"],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "tax",
+      "value": {
+        "round": {
+          "expr": {
+            "arith": {
+              "op": "div",
+              "left": {"field": {"name": "subtotal"}},
+              "right": {"lit": 10}
+            }
+          },
+          "mode": "floor"
+        }
+      }
+    }
+  ]
+}

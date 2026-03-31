@@ -1,0 +1,6 @@
+{
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": [],
+  "assigns": []
+}

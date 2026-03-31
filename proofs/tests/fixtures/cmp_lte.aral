@@ -1,0 +1,3 @@
+# Total must not exceed cap
+invariant total_capped:
+  order.total <= 10000

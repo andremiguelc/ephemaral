@@ -1,0 +1,12 @@
+{
+  "name": "broken",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "total",
+      "value": { "round": { "expr": { "lit": 5 }, "mode": "truncate" } }
+    }
+  ]
+}

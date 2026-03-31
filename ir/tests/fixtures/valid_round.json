@@ -1,0 +1,24 @@
+{
+  "name": "floorTotal",
+  "inputType": "Order",
+  "inputFields": [
+    "total",
+    "subtotal"
+  ],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "total",
+      "value": {
+        "round": {
+          "mode": "floor",
+          "expr": {
+            "field": {
+              "name": "subtotal"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

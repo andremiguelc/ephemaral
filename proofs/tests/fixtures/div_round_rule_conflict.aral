@@ -1,0 +1,7 @@
+# Share must not exceed total
+invariant share_bounded:
+  order.share <= order.total
+
+# Total must be non-negative
+invariant total_non_negative:
+  order.total >= 0

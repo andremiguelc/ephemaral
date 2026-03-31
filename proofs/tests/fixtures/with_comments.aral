@@ -1,0 +1,6 @@
+# This is a comment that should be ignored
+# Another comment line
+
+# The total the customer pays must never be negative
+invariant total_non_negative:
+  order.total >= 0

@@ -1,0 +1,19 @@
+# Lean 4
+proofs/.lake/
+lake-packages/
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# IDE
+.DS_Store
+.vscode/
+
+# Test artifacts
+snapshots/

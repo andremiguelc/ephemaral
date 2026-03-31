@@ -1,0 +1,7 @@
+# Total must be non-negative
+invariant total_non_negative:
+  order.total >= 0
+
+# Margin must be non-negative
+invariant margin_non_negative:
+  order.subtotal - order.total >= 0

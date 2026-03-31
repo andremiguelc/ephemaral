@@ -1,0 +1,7 @@
+{
+  "name": "identity",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": [],
+  "assigns": []
+}
