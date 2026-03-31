@@ -1,0 +1,41 @@
+{
+  "name": "adjustBalance",
+  "inputType": "Account",
+  "inputFields": [
+    "balance"
+  ],
+  "params": [
+    "fee",
+    "bonus"
+  ],
+  "assigns": [
+    {
+      "fieldName": "balance",
+      "value": {
+        "arith": {
+          "op": "add",
+          "left": {
+            "arith": {
+              "op": "sub",
+              "left": {
+                "field": {
+                  "name": "balance"
+                }
+              },
+              "right": {
+                "field": {
+                  "name": "fee"
+                }
+              }
+            }
+          },
+          "right": {
+            "field": {
+              "name": "bonus"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

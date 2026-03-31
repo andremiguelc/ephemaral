@@ -1,0 +1,26 @@
+{
+  "name": "tripleBalance",
+  "inputType": "Account",
+  "inputFields": [
+    "balance"
+  ],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "balance",
+      "value": {
+        "arith": {
+          "op": "mul",
+          "left": {
+            "field": {
+              "name": "balance"
+            }
+          },
+          "right": {
+            "lit": 3
+          }
+        }
+      }
+    }
+  ]
+}

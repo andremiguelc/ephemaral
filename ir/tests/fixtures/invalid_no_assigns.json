@@ -1,0 +1,6 @@
+{
+  "name": "broken",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": []
+}

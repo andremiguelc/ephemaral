@@ -1,0 +1,12 @@
+{
+  "name": "broken",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "total",
+      "value": { "arith": { "op": "modulo", "left": { "lit": 10 }, "right": { "lit": 3 } } }
+    }
+  ]
+}

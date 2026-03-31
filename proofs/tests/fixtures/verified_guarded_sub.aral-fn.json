@@ -1,0 +1,72 @@
+{
+  "name": "withdrawGuarded",
+  "inputType": "Account",
+  "inputFields": [
+    "balance"
+  ],
+  "params": [
+    "amount"
+  ],
+  "assigns": [
+    {
+      "fieldName": "balance",
+      "value": {
+        "ite": {
+          "cond": {
+            "logic": {
+              "op": "or",
+              "left": {
+                "cmp": {
+                  "op": "lte",
+                  "left": {
+                    "field": {
+                      "name": "amount"
+                    }
+                  },
+                  "right": {
+                    "lit": 0
+                  }
+                }
+              },
+              "right": {
+                "cmp": {
+                  "op": "gt",
+                  "left": {
+                    "field": {
+                      "name": "amount"
+                    }
+                  },
+                  "right": {
+                    "field": {
+                      "name": "balance"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "field": {
+              "name": "balance"
+            }
+          },
+          "else": {
+            "arith": {
+              "op": "sub",
+              "left": {
+                "field": {
+                  "name": "balance"
+                }
+              },
+              "right": {
+                "field": {
+                  "name": "amount"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "test",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": ["amount"],
+  "typedParams": [{"name": "amount"}],
+  "assigns": [
+    {"fieldName": "total", "value": {"field": "amount"}}
+  ]
+}

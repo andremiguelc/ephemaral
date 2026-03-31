@@ -1,0 +1,3 @@
+# Line value must be non-negative
+invariant line_value_non_negative:
+  item.unitPrice * item.quantity >= 0

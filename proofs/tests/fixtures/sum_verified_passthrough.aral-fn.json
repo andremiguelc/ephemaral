@@ -1,0 +1,9 @@
+{
+  "name": "updateStatus",
+  "inputType": "Order",
+  "inputFields": ["total", "status"],
+  "params": [],
+  "assigns": [
+    {"fieldName": "status", "value": {"lit": 1}}
+  ]
+}

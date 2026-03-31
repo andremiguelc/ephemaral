@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ephemaral.com/aral-fn.schema.json",
+  "version": "0.1.0",
+  "title": "Aral-fn",
+  "description": "Function representation for ephemaral verification. Describes a pure data transformation: a function that takes a typed input (plus optional parameters) and returns the same type with some fields changed via spread-and-override. This is the proof boundary — everything before this format is unproved (parsers, LLMs), everything after is proved correct in Lean 4.",
+  "type": "object",
+  "required": ["name", "inputType", "inputFields", "params", "assigns"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Function name (for display in diagnostics).",
+      "examples": ["adjustValue", "applyRate", "updateRecord"]
+    },
+    "inputType": {
+      "type": "string",
+      "description": "The type being transformed. Matched case-insensitively against the invariant root prefix (e.g., 'Record' matches 'record.value >= 0').",
+      "examples": ["Record", "Entry"]
+    },
+    "inputFields": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "All fields on the input type relevant to verification. These become 'in-*' and 'out-*' constants in the SMT encoding. Fields not listed here are assumed unchanged by spread.",
+      "examples": [["value", "result"], ["amount"]]
+    },
+    "params": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Extra parameters beyond the input object. These are free variables in the verification — Z3 will try all possible values.",
+      "examples": [["delta"], ["rate"]]
+    },
+    "typedParams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Parameter name (must also appear in params)."
+          },
+          "type": {
+            "type": "string",
+            "description": "Type name, matched case-insensitively against .aral root prefixes to apply invariants as preconditions."
+          }
+        }
+      },
+      "description": "Typed parameters. When present, the pipeline can route .aral files by type: invariants whose root matches a typed param's type are applied as preconditions on that parameter."
+    },
+    "assigns": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/FieldAssign" },
+      "description": "Which fields change and to what expression. Fields not listed here are preserved by the spread operator."
+    },
+    "optionalFields": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Fields that may be absent (nullable/optional). For each field listed here, the pipeline generates a presence flag ('has-{field}') constrained to 0 or 1. Invariants referencing optional fields are implicitly guarded by presence.",
+      "examples": [["bonus", "override"]]
+    }
+  },
+  "$defs": {
+    "FieldAssign": {
+      "type": "object",
+      "required": ["fieldName", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "fieldName": {
+          "type": "string",
+          "description": "Which output field is being set."
+        },
+        "value": {
+          "$ref": "#/$defs/Expr",
+          "description": "Expression computing the new value."
+        }
+      }
+    },
+    "Expr": {
+      "description": "An expression in the function body. Seven variants: numeric literals, field/parameter references, arithmetic (+, -, *, /), if-then-else, rounding, and collection sum.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["lit"],
+          "additionalProperties": false,
+          "properties": {
+            "lit": {
+              "type": "integer",
+              "description": "Numeric literal. Compiled to SMT-LIB Real. Convention: 1 = true, 0 = false for boolean fields."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["field"],
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "type": "object",
+              "required": ["name"],
+              "additionalProperties": false,
+              "description": "Reference to a field. Simple refs (name only) resolve against inputFields or params. Qualified refs (qualifier + name) are fields on a typed parameter (e.g., config.rate).",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Field name (e.g., 'value', 'rate')."
+                },
+                "qualifier": {
+                  "type": "string",
+                  "description": "Optional qualifier — the parameter name for qualified field access (e.g., 'config' for config.rate). Omit for simple input-type fields."
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["arith"],
+          "additionalProperties": false,
+          "properties": {
+            "arith": {
+              "type": "object",
+              "required": ["op", "left", "right"],
+              "additionalProperties": false,
+              "properties": {
+                "op": {
+                  "type": "string",
+                  "enum": ["add", "sub", "mul", "div"],
+                  "description": "Arithmetic operator: add (+), sub (-), mul (*), div (/ total: a/0=0)."
+                },
+                "left": { "$ref": "#/$defs/Expr" },
+                "right": { "$ref": "#/$defs/Expr" }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["ite"],
+          "additionalProperties": false,
+          "properties": {
+            "ite": {
+              "type": "object",
+              "required": ["cond", "then", "else"],
+              "additionalProperties": false,
+              "description": "If-then-else: evaluates cond, returns then-branch if true, else-branch if false.",
+              "properties": {
+                "cond": { "$ref": "#/$defs/BoolExpr" },
+                "then": { "$ref": "#/$defs/Expr" },
+                "else": { "$ref": "#/$defs/Expr" }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["round"],
+          "additionalProperties": false,
+          "properties": {
+            "round": {
+              "type": "object",
+              "required": ["expr", "mode"],
+              "additionalProperties": false,
+              "description": "Rounding: applies a rounding mode to an expression.",
+              "properties": {
+                "expr": { "$ref": "#/$defs/Expr" },
+                "mode": {
+                  "type": "string",
+                  "enum": ["floor", "ceil", "half_up"],
+                  "description": "Rounding mode: floor (toward -∞), ceil (toward +∞), half_up (standard rounding)."
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["sum"],
+          "additionalProperties": false,
+          "properties": {
+            "sum": {
+              "type": "object",
+              "required": ["collection", "body"],
+              "additionalProperties": false,
+              "description": "Sum over collection items. Collection is a plain field name (always on the input type). Body is a per-item expression — field refs inside are item-scoped.",
+              "properties": {
+                "collection": {
+                  "type": "string",
+                  "description": "Collection field name on the input type (e.g., 'entries')."
+                },
+                "body": {
+                  "$ref": "#/$defs/Expr",
+                  "description": "Per-item expression. Field refs are item-scoped (e.g., 'amount', 'quantity')."
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "BoolExpr": {
+      "description": "A boolean expression used as a condition in if-then-else. Supports comparisons, boolean logic, negation, and field presence checks.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["cmp"],
+          "additionalProperties": false,
+          "properties": {
+            "cmp": {
+              "type": "object",
+              "required": ["op", "left", "right"],
+              "additionalProperties": false,
+              "properties": {
+                "op": {
+                  "type": "string",
+                  "enum": ["eq", "neq", "gt", "lt", "gte", "lte"],
+                  "description": "Comparison operator: eq (==), neq (!=), gt (>), lt (<), gte (>=), lte (<=)."
+                },
+                "left": { "$ref": "#/$defs/Expr" },
+                "right": { "$ref": "#/$defs/Expr" }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["logic"],
+          "additionalProperties": false,
+          "properties": {
+            "logic": {
+              "type": "object",
+              "required": ["op", "left", "right"],
+              "additionalProperties": false,
+              "properties": {
+                "op": {
+                  "type": "string",
+                  "enum": ["and", "or"],
+                  "description": "Boolean logic operator."
+                },
+                "left": { "$ref": "#/$defs/BoolExpr" },
+                "right": { "$ref": "#/$defs/BoolExpr" }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["not"],
+          "additionalProperties": false,
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/BoolExpr",
+              "description": "Boolean negation."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["isPresent"],
+          "additionalProperties": false,
+          "properties": {
+            "isPresent": {
+              "type": "object",
+              "required": ["name"],
+              "additionalProperties": false,
+              "description": "Field presence check for nullable/optional fields. Returns true if the field has a value. Uses the same field reference format as Expr.field.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Field name to check presence of."
+                },
+                "qualifier": {
+                  "type": "string",
+                  "description": "Optional qualifier for qualified field access (e.g., typed parameter fields)."
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "broken",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": [],
+  "assigns": [],
+  "description": "this property is not in the schema"
+}

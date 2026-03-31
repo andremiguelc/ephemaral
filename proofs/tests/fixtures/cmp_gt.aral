@@ -1,0 +1,3 @@
+# Total must be strictly positive
+invariant total_positive:
+  order.total > 0

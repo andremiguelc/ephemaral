@@ -1,0 +1,3 @@
+# Order total must equal the sum of line item subtotals
+invariant total_matches_items:
+  order.total == sum(order.lineItems, subtotal)

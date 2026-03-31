@@ -1,0 +1,26 @@
+{
+  "name": "negateBalance",
+  "inputType": "Account",
+  "inputFields": [
+    "balance"
+  ],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "balance",
+      "value": {
+        "arith": {
+          "op": "sub",
+          "left": {
+            "lit": 0
+          },
+          "right": {
+            "field": {
+              "name": "balance"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

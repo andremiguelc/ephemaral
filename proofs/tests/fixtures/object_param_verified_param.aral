@@ -1,0 +1,7 @@
+# Scaled amount must be non-negative
+invariant scaled_amount_non_negative:
+  scaledAmount.amount >= 0
+
+# Scale must be non-negative
+invariant scaled_scale_non_negative:
+  scaledAmount.scale >= 0

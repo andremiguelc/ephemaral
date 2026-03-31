@@ -1,0 +1,30 @@
+{
+  "name": "withdraw",
+  "inputType": "Account",
+  "inputFields": [
+    "balance"
+  ],
+  "params": [
+    "amount"
+  ],
+  "assigns": [
+    {
+      "fieldName": "balance",
+      "value": {
+        "arith": {
+          "op": "sub",
+          "left": {
+            "field": {
+              "name": "balance"
+            }
+          },
+          "right": {
+            "field": {
+              "name": "amount"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

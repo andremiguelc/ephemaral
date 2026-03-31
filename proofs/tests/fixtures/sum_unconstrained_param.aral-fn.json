@@ -1,0 +1,9 @@
+{
+  "name": "applyAdjustment",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": ["adjustment"],
+  "assigns": [
+    {"fieldName": "total", "value": {"arith": {"op": "add", "left": {"field": {"name": "total"}}, "right": {"field": {"name": "adjustment"}}}}}
+  ]
+}

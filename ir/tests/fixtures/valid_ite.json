@@ -1,0 +1,60 @@
+{
+  "name": "clampBalance",
+  "inputType": "Account",
+  "inputFields": [
+    "balance"
+  ],
+  "params": [
+    "fee"
+  ],
+  "assigns": [
+    {
+      "fieldName": "balance",
+      "value": {
+        "ite": {
+          "cond": {
+            "cmp": {
+              "op": "gte",
+              "left": {
+                "arith": {
+                  "op": "sub",
+                  "left": {
+                    "field": {
+                      "name": "balance"
+                    }
+                  },
+                  "right": {
+                    "field": {
+                      "name": "fee"
+                    }
+                  }
+                }
+              },
+              "right": {
+                "lit": 0
+              }
+            }
+          },
+          "then": {
+            "arith": {
+              "op": "sub",
+              "left": {
+                "field": {
+                  "name": "balance"
+                }
+              },
+              "right": {
+                "field": {
+                  "name": "fee"
+                }
+              }
+            }
+          },
+          "else": {
+            "lit": 0
+          }
+        }
+      }
+    }
+  ]
+}

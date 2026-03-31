@@ -1,0 +1,25 @@
+{
+  "name": "applyDiscount",
+  "inputType": "Order",
+  "inputFields": ["subtotal", "total", "discount"],
+  "optionalFields": ["discount"],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "total",
+      "value": {
+        "arith": {
+          "op": "sub",
+          "left": { "field": { "name": "subtotal" } },
+          "right": {
+            "ite": {
+              "cond": { "isPresent": { "name": "discount" } },
+              "then": { "field": { "name": "discount" } },
+              "else": { "arith": { "op": "mul", "left": { "field": { "name": "subtotal" } }, "right": { "lit": 2 } } }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "computeTotal",
+  "inputType": "Order",
+  "inputFields": ["total", "tax"],
+  "params": [],
+  "assigns": [
+    {"fieldName": "total", "value": {"field": {"name": "tax"}}}
+  ]
+}

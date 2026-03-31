@@ -1,0 +1,3 @@
+# Discount amount must be non-negative
+invariant discount_non_negative:
+  discount.discountAmount >= 0

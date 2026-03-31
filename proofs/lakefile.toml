@@ -1,0 +1,24 @@
+name = "ephemaral"
+version = "0.1.0"
+keywords = ["verification", "formal-methods", "business-logic"]
+defaultTargets = ["Proofs"]
+
+[leanOptions]
+pp.unicode.fun = true # pretty-prints `fun a ↦ b`
+relaxedAutoImplicit = false
+weak.linter.mathlibStandardSet = true
+maxSynthPendingDepth = 3
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.28.0"
+
+# Library: types, compiler functions, and proofs
+[[lean_lib]]
+name = "Proofs"
+
+# Executable: the CLI (verify + compile modes)
+[[lean_exe]]
+name = "ephemaral"
+root = "Main"

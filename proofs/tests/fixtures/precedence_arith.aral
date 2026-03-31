@@ -1,0 +1,3 @@
+# Precedence: mul binds tighter than add
+invariant total_equals_rate_plus_fee:
+  order.total == order.base * order.rate + order.fee

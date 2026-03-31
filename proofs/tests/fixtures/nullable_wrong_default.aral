@@ -1,0 +1,11 @@
+invariant subtotal_non_negative:
+  order.subtotal >= 0
+
+invariant total_non_negative:
+  order.total >= 0
+
+invariant discount_non_negative:
+  order.discount >= 0
+
+invariant discount_bounded:
+  order.discount <= order.subtotal

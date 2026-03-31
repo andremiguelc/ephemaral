@@ -1,0 +1,23 @@
+{
+  "name": "computeShare",
+  "inputType": "Order",
+  "inputFields": ["share", "total"],
+  "params": ["parts"],
+  "assigns": [
+    {
+      "fieldName": "share",
+      "value": {
+        "round": {
+          "expr": {
+            "arith": {
+              "op": "div",
+              "left": {"field": {"name": "total"}},
+              "right": {"field": {"name": "parts"}}
+            }
+          },
+          "mode": "ceil"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "name": "multiply",
+  "inputType": "DineroSnapshot",
+  "inputFields": [
+    "amount",
+    "scale"
+  ],
+  "params": [
+    "scaledAmount-amount",
+    "scaledAmount-scale"
+  ],
+  "typedParams": [
+    {
+      "name": "scaledAmount",
+      "type": "ScaledAmount"
+    }
+  ],
+  "assigns": [
+    {
+      "fieldName": "amount",
+      "value": {
+        "arith": {
+          "op": "mul",
+          "left": {
+            "field": {
+              "name": "amount"
+            }
+          },
+          "right": {
+            "field": {
+              "qualifier": "scaledAmount", "name": "amount"
+            }
+          }
+        }
+      }
+    },
+    {
+      "fieldName": "scale",
+      "value": {
+        "arith": {
+          "op": "add",
+          "left": {
+            "field": {
+              "name": "scale"
+            }
+          },
+          "right": {
+            "field": {
+              "qualifier": "scaledAmount", "name": "scale"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

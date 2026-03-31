@@ -1,0 +1,7 @@
+# Total must be non-negative
+invariant total_non_negative:
+  order.total >= 0
+
+# Subtotal must be non-negative
+invariant subtotal_non_negative:
+  order.subtotal >= 0

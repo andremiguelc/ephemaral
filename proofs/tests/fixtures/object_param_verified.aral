@@ -1,0 +1,7 @@
+# Amount must be non-negative
+invariant amount_non_negative:
+  dineroSnapshot.amount >= 0
+
+# Scale must be non-negative
+invariant scale_non_negative:
+  dineroSnapshot.scale >= 0

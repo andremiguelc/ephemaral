@@ -1,0 +1,3 @@
+# Margin must be non-negative
+invariant margin_non_negative:
+  order.subtotal - order.total >= 0
