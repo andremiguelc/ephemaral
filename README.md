@@ -20,9 +20,6 @@ mkdir -p .ephemaral/bin
 # macOS (Apple Silicon)
 curl -L -o .ephemaral/bin/ephemaral https://github.com/andremiguelc/ephemaral/releases/latest/download/ephemaral-macos-arm64
 
-# macOS (Intel)
-curl -L -o .ephemaral/bin/ephemaral https://github.com/andremiguelc/ephemaral/releases/latest/download/ephemaral-macos-x86_64
-
 # Linux (x86_64)
 curl -L -o .ephemaral/bin/ephemaral https://github.com/andremiguelc/ephemaral/releases/latest/download/ephemaral-linux-x86_64
 
@@ -51,9 +48,9 @@ When using ephemaral in a project, the `.ephemaral/` directory holds all verific
 ├── bin/
 │   └── ephemaral               # binary (gitignored)
 ├── parsed/                     # parser output (gitignored, regenerable)
-│   └── withdraw.aral-fn.json
+│   └── function.aral-fn.json
 └── rules/                      # invariant files (checked in)
-    └── account.aral
+    └── inv1.aral
 ```
 
 - **bin/** — the ephemaral binary. Gitignore this.
