@@ -27,6 +27,9 @@ class TestValidFixtures:
     def test_valid_typed_params(self, schema):
         validate(load_fixture("valid_typed_params.json"), schema)
 
+    def test_valid_each(self, schema):
+        validate(load_fixture("valid_each.json"), schema)
+
 
 # ============================================================
 # Existing ir/examples/ must all validate
@@ -74,3 +77,7 @@ class TestInvalidFixtures:
     def test_typed_params_missing_type(self, schema):
         with pytest.raises(ValidationError, match="'type' is a required property"):
             validate(load_fixture("invalid_typed_params_missing_type.json"), schema)
+
+    def test_each_missing_body(self, schema):
+        with pytest.raises(ValidationError, match="'body' is a required property"):
+            validate(load_fixture("invalid_each_no_body.json"), schema)
