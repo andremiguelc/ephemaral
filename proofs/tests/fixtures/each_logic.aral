@@ -1,0 +1,3 @@
+# Every line item must have positive quantity and non-negative price
+invariant items_valid:
+  each(order.lineItems, quantity > 0 and unitPrice >= 0)
