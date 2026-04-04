@@ -184,8 +184,8 @@ def resolveParamPreconditions (funRepr : FunctionRepr) (frags : List CompiledInv
           consts := frag.consts.map (pfx ++ ·) }
       | none => none
 
-/-- Extract invariant names from blocks that failed to compile (for skip reporting). -/
-private def extractSkippedNames (blocks : List String) : List String :=
+/-- Extract invariant names + skip reasons from blocks that failed to compile. -/
+private def extractSkippedInfo (blocks : List String) : List (String × String) :=
   blocks.filter (fun b => (tryCompileBlock b).isNone)
     |>.filterMap fun block =>
       let lines := cleanLines block
@@ -194,7 +194,7 @@ private def extractSkippedNames (blocks : List String) : List String :=
         if l.startsWith "invariant " then
           let afterPrefix := (l.drop 10).trimAscii.toString
           if afterPrefix.endsWith ":" then
-            some (afterPrefix.dropEnd 1).toString
+            some ((afterPrefix.dropEnd 1).toString, diagnoseSkipReason block)
           else none
         else none
       | none => none
@@ -250,11 +250,13 @@ def verifyFunction (funRepr : FunctionRepr) (invariantBlocks : List String)
   let funRepr := { funRepr with
     inputFields := augmentFields funRepr.inputFields funRepr.params invConsts }
 
-  -- Detect skipped invariants (unsupported syntax)
-  let allSkippedNames := extractSkippedNames inputBlocks ++ extractSkippedNames paramBlocks
-  let skipWarning := if allSkippedNames.isEmpty then none
-    else some (s!"Skipped {allSkippedNames.length} invariant(s) with unsupported syntax: " ++
-      ", ".intercalate allSkippedNames)
+  -- Detect skipped invariants (unsupported syntax) with specific reasons
+  let allSkippedInfo := extractSkippedInfo inputBlocks ++ extractSkippedInfo paramBlocks
+  let skipWarning := if allSkippedInfo.isEmpty then none
+    else
+      let lines := allSkippedInfo.map fun (name, reason) => s!"  {name}: {reason}"
+      some (s!"Skipped {allSkippedInfo.length} invariant(s) with unsupported syntax:\n" ++
+        "\n".intercalate lines)
 
   -- Route warning for unmatched roots
   let routeWarning := if skippedRoots.isEmpty then none
