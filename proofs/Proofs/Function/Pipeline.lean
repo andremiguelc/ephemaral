@@ -33,7 +33,7 @@ def extractBlockRoot (block : String) : Option String :=
   let lines := cleanLines block
   if lines.length ≥ 2 then
     let bodyLine := lines[1]!
-    let tokens := bodyLine.splitOn " " |>.filter (!·.isEmpty)
+    let tokens := tokenize bodyLine
     extractRoot tokens
   else none
 
