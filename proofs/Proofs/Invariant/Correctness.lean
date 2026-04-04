@@ -47,6 +47,11 @@ mutual
       rw [compileInvBoolExpr_preserves env inner]
     | .isPresent ref =>
       simp [evalBoolExpr, compileInvBoolExpr, evalSmtBoolExpr, evalCompOp, evalSmtExpr]
+    | .eachExpr coll body =>
+      simp [evalBoolExpr, evalSmtBoolExpr, compileInvBoolExpr]
+      congr 1
+      funext i
+      exact compileInvBoolExpr_preserves (itemEnvAt env coll.toKey i) body
 end
 
 /-- For any env and invariant: dslSemantics env inv = smtSemantics env (compile inv).

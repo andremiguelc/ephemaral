@@ -21,6 +21,7 @@ mutual
     | .logic op l r  => .logic op (compileInvBoolExpr l) (compileInvBoolExpr r)
     | .neg b         => .neg (compileInvBoolExpr b)
     | .isPresent ref => .cmp .neq (.const ("has-" ++ ref.toKey)) (.lit 0)
+    | .eachExpr coll body => .eachExpr coll.toKey (compileInvBoolExpr body)
 end
 
 mutual
@@ -40,6 +41,7 @@ mutual
     | .logic _ l r   => collectFieldsBool l ++ collectFieldsBool r
     | .neg b         => collectFieldsBool b
     | .isPresent ref => ["has-" ++ ref.toKey]
+    | .eachExpr coll _body => [coll.toKey ++ "-len"]
 end
 
 /-- Invariant → CompiledInvariant: collect constants, compile body, generate SMT-LIB name. -/
