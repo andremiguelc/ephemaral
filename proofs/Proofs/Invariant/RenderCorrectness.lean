@@ -173,6 +173,8 @@ mutual
     | .cmp _ l r => l.ParenSafe ∧ r.ParenSafe
     | .logic _ l r => l.ParenSafe ∧ r.ParenSafe
     | .neg b => b.ParenSafe
+    | .eachExpr collKey body =>
+        (∀ c ∈ collKey.toList, c ≠ '(' ∧ c ≠ ')') ∧ body.ParenSafe
 end
 
 mutual
@@ -285,4 +287,15 @@ mutual
       have ihi := renderSmtBoolExpr_balanced inner hi
       show parenBalance ("(not " ++ renderSmtBoolExpr inner ++ ")") = 0
       simp only [parenBalance_append, ihi]; native_decide
+    | .eachExpr collKey body =>
+      simp only [renderSmtBoolExpr]
+      have ⟨hk, _hb⟩ : (∀ c ∈ collKey.toList, c ≠ '(' ∧ c ≠ ')') ∧ body.ParenSafe := h
+      show parenBalance ("(" ++ ("each-" ++ collKey) ++ " " ++ (collKey ++ "-len") ++ ")") = 0
+      simp only [parenBalance_append]
+      have hk0 := parenBalance_no_parens collKey hk
+      have : parenBalance ("each-" ++ collKey) = 0 := by
+        rw [parenBalance_append, hk0]; native_decide
+      have : parenBalance (collKey ++ "-len") = 0 := by
+        rw [parenBalance_append, hk0]; native_decide
+      simp only [*]; native_decide
 end
