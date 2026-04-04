@@ -156,10 +156,10 @@ Releases are triggered by pushing a version tag. The release workflow (`.github/
 ```bash
 # 1. Merge your branch into main
 git checkout main
-git merge v0.1.1
+git merge <branch>
 
 # 2. Tag the release
-git tag v0.1.1
+git tag v<version>
 
 # 3. Push (tag triggers the release workflow)
 git push origin main --tags
