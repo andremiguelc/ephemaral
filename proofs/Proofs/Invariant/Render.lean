@@ -257,7 +257,7 @@ def renderSmtFile (frags : List CompiledInvariant) : String :=
   let constDecls := scalarConsts.map (fun c => s!"(declare-const {c} Real)")
   let sumDecls := sumDefs.flatMap renderSumDef
   let eachDecls := eachDefs.flatMap renderEachDef
-  let collDecls := sumDecls ++ eachDecls
+  let collDecls := (sumDecls ++ eachDecls).eraseDups
   -- Render each invariant as a define-fun
   let defFuns := frags.map fun frag =>
     let body := renderSmtBoolExpr frag.body
