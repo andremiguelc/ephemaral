@@ -109,4 +109,36 @@ mutual
         simp [evalBoolExpr, compileFunBoolExpr, evalSmtBoolExpr, evalCompOp,
               evalSmtExpr, funEnv, inField, FieldRef.toKey]
         split <;> simp [evalSmtExpr]
+    | .eachExpr coll body =>
+      simp only [evalBoolExpr, evalSmtBoolExpr, compileFunBoolExpr, inField]
+      -- Same bridge chain as sumExpr: funEnv → bare env → in-prefixed env → SMT
+      have hItemEnv : ∀ i, itemEnvAt (funEnv env inputFields) coll.toKey i
+                        = itemEnvAt env coll.toKey i := by
+        intro i; funext name; simp only [itemEnvAt, funEnv]
+        split
+        · rename_i h_in
+          have := (h_safe coll.toKey i name).1
+          simp_all
+        · rfl
+      have hLen : (funEnv env inputFields (coll.toKey ++ "-len")).floor.toNat
+                = (env (coll.toKey ++ "-len")).floor.toNat := by
+        simp only [funEnv]
+        split
+        · rename_i h_in
+          have := (h_safe coll.toKey 0 "").2
+          simp_all
+        · rfl
+      have hLenBridge : (env (coll.toKey ++ "-len")).floor.toNat
+                      = (env ("in-" ++ coll.toKey ++ "-len")).floor.toNat := by
+        rw [h_pass coll.toKey "-len"]
+      have hItemBridge : ∀ i, itemEnvAt env coll.toKey i
+                           = itemEnvAt env ("in-" ++ coll.toKey) i := by
+        intro i; funext name; simp only [itemEnvAt]
+        have := h_pass coll.toKey ("-" ++ toString i ++ "-" ++ name)
+        simp only [String.append_assoc] at this ⊢
+        exact this
+      rw [hLen, hLenBridge]
+      congr 1
+      funext i; rw [hItemEnv, hItemBridge]
+      exact compileInvBoolExpr_preserves (itemEnvAt env ("in-" ++ coll.toKey) i) body
 end
