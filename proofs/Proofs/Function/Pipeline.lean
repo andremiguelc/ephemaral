@@ -292,6 +292,30 @@ def verifyFunction (funRepr : FunctionRepr) (invariantBlocks : List String)
 
   -- Layer 1: compile and render
   let funFrag := compileFun funRepr
+
+  -- Warn about collections used in function body but not referenced by any rule
+  let funBodyCollKeys := funFrag.assignDefs.flatMap (fun (_, expr) =>
+    (collectSumExprs expr).map (·.collKey) ++ (collectEachExprs expr).map (·.collKey))
+    |>.eraseDups
+  let invCollKeys := (relevantFrags.flatMap fun frag =>
+    let prefixed := prefixSmtBoolExpr "in-" frag.body
+    (collectSumBoolExprs prefixed).map (·.collKey) ++
+    (collectEachBoolExprs prefixed).map (·.collKey))
+    |>.eraseDups
+  let unreferencedColls := funBodyCollKeys.filter (fun c => !invCollKeys.contains c)
+    |>.map (fun s => if s.startsWith "in-" then (s.drop 3).toString else s)
+  let collWarning := if unreferencedColls.isEmpty then none
+    else some (
+      "Note: the function computes over " ++
+      ", ".intercalate (unreferencedColls.map (s!"'{·}'")) ++
+      " but no rule references " ++
+      (if unreferencedColls.length == 1 then "this collection." else "these collections.") ++
+      " Verification will check the function against the provided rules only.")
+  let combinedWarning := match (combinedWarning, collWarning) with
+    | (some w, some cw) => some (w ++ "\n" ++ cw)
+    | (none, some cw) => some cw
+    | (w, none) => w
+
   let smt := renderVerification funFrag relevantFrags funRepr.name relevantParamFrags funRepr.optionalFields
   -- Collect constrained param identifiers:
   --   Scalar: the param name itself (e.g., "discountAmount")
@@ -368,9 +392,19 @@ def verifyAndDiagnose (funRepr : FunctionRepr) (invariantBlocks : List String)
     pure (formatDiagnosticReport diagInput)
   | "unsat" =>
     pure (formatVerified diagInput)
-  | other =>
-    let msg := if z3out.stderr.isEmpty then "" else s!"\nZ3 stderr: {z3out.stderr}"
-    pure s!"Z3 returned unexpected result: {other}{msg}"
+  | _other =>
+    let debugHint := if debug then "" else " Run with --debug for more detail."
+    pure ("\n".intercalate [
+      "VERIFICATION INCOMPLETE",
+      "",
+      s!"Function: {ctx.funName}",
+      s!"Verification could not be completed for this function and rules combination.{debugHint}",
+      "",
+      "--- What to do ---",
+      "  1. Check that field names in your rules match the function's input fields",
+      "  2. Try simplifying — split collection rules (sum, each) into separate .aral files",
+      "  3. If the problem persists, run with --debug and report the issue"
+    ])
   let warningSection := match warnings with
     | some w => w ++ "\n\n"
     | none => ""

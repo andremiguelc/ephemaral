@@ -81,10 +81,29 @@ def renderVerification (funFrag : CompiledFunction) (invFrags : List CompiledInv
   let header := s!"; Ephemaral — Function verification: {funName}"
 
   -- Detect collections from invariant fragments (find sumExpr and eachExpr nodes)
-  let inputSumDefs := invFrags.flatMap fun frag =>
+  -- Dedup by collKey within each category (same pattern as Invariant/Render.renderSmtFile)
+  let rawInputSumDefs := invFrags.flatMap fun frag =>
     collectSumBoolExprs (prefixSmtBoolExpr "in-" frag.body)
-  let inputEachDefs := invFrags.flatMap fun frag =>
+  let inputSumDefs := rawInputSumDefs.foldl (fun acc sd =>
+    if acc.any (·.collKey == sd.collKey) then acc else acc ++ [sd]) []
+  let rawInputEachDefs := invFrags.flatMap fun frag =>
     collectEachBoolExprs (prefixSmtBoolExpr "in-" frag.body)
+  let inputEachDefs := rawInputEachDefs.foldl (fun acc ed =>
+    if acc.any (·.collKey == ed.collKey) then acc else acc ++ [ed]) []
+  -- Also detect collections from function body (assignments may use sum/each)
+  let rawFunSumDefs := funFrag.assignDefs.flatMap fun (_, expr) =>
+    collectSumExprs expr
+  let funSumDefs := rawFunSumDefs.foldl (fun acc sd =>
+    if acc.any (·.collKey == sd.collKey) then acc else acc ++ [sd]) []
+  let rawFunEachDefs := funFrag.assignDefs.flatMap fun (_, expr) =>
+    collectEachExprs expr
+  let funEachDefs := rawFunEachDefs.foldl (fun acc ed =>
+    if acc.any (·.collKey == ed.collKey) then acc else acc ++ [ed]) []
+  -- Merge: invariant-sourced + function-body-sourced (dedup by collKey, invariant wins)
+  let inputSumDefs := inputSumDefs ++ funSumDefs.filter fun sd =>
+    !inputSumDefs.any (·.collKey == sd.collKey)
+  let inputEachDefs := inputEachDefs ++ funEachDefs.filter fun ed =>
+    !inputEachDefs.any (·.collKey == ed.collKey)
   -- All collections pass through (Scenario A: read-only collections)
   -- Output invariants reuse input accessor functions.
   -- Strip "in-" prefix (3 chars) from input collKey to get bare collection name
@@ -123,9 +142,10 @@ def renderVerification (funFrag : CompiledFunction) (invFrags : List CompiledInv
   let constDecls := scalarConsts.map (fun c => s!"(declare-const {c} Real)")
 
   -- 1b. Collection declarations (accessor functions + define-fun-rec)
+  --      eraseDups removes shared declare-fun/declare-const when sum and each target the same collection
   let sumDecls := inputSumDefs.flatMap renderSumDef
   let eachDecls := inputEachDefs.flatMap renderEachDef
-  let sumDecls := sumDecls ++ eachDecls
+  let collDecls := (sumDecls ++ eachDecls).eraseDups
 
   -- 2. Unchanged field equalities
   --    Also include invariant-referenced fields not in the function's field set
@@ -185,8 +205,8 @@ def renderVerification (funFrag : CompiledFunction) (invFrags : List CompiledInv
     ++ [""]
     ++ ["; --- Constants ---"]
     ++ constDecls
-    ++ (if sumDecls.isEmpty then []
-        else ["", "; --- Collection definitions ---"] ++ sumDecls)
+    ++ (if collDecls.isEmpty then []
+        else ["", "; --- Collection definitions ---"] ++ collDecls)
     ++ [""]
     ++ ["; --- Unchanged fields ---"]
     ++ unchangedAsserts
