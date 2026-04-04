@@ -141,10 +141,11 @@ theorem parseCmpExpr_sound (tokens : List String) (root : String) (b : BoolExpr)
           exact ⟨_, _, _, _, opIdx, op, lhs, rhs, rfl⟩
 
 /-- **parseBoolExpr is sound.** If parseBoolExpr succeeds, the result is
-    either a conjunction, disjunction, or bare comparison — matching exactly
-    which branch of the parser produced it. -/
+    an each expression, a conjunction, disjunction, or bare comparison —
+    matching exactly which branch of the parser produced it. -/
 theorem parseBoolExpr_sound (tokens : List String) (root : String) (b : BoolExpr) :
     parseBoolExpr tokens root = some b →
+    (parseEachExpr (List.drop 1 tokens) root = some b) ∨
     (∃ idx l r,
       tokens.findIdx? (· == "and") = some idx ∧
       parseCmpExpr (tokens.take idx) root = some l ∧
@@ -158,30 +159,53 @@ theorem parseBoolExpr_sound (tokens : List String) (root : String) (b : BoolExpr
     (parseCmpExpr tokens root = some b) := by
   unfold parseBoolExpr
   simp only [bind, Option.bind]
+  -- The each check comes first
   split
-  · -- Found "and": do chain with two parseCmpExpr calls
-    rename_i idx h_and
+  · -- tokens[0]! == "each"
     split
-    · simp
-    · rename_i l
-      dsimp only []
+    · -- parseEachExpr succeeded → each branch
+      rename_i eachE h_parse
+      intro h_eq
+      have : eachE = b := by cases h_eq; rfl
+      subst this
+      left; exact h_parse
+    · -- parseEachExpr failed → fall through to and/or/cmp
       split
-      · simp
-      · rename_i r
-        intro h; cases h
-        left; exact ⟨_, _, _, h_and, ‹_›, ‹_›, rfl⟩
-  · -- No "and", check "or"
-    split
-    · rename_i idx h_or
-      split
-      · simp
-      · rename_i l
-        dsimp only []
+      · rename_i idx h_and
         split
         · simp
-        · rename_i r
-          intro h; cases h
-          right; left; exact ⟨_, _, _, h_or, ‹_›, ‹_›, rfl⟩
-    · -- No "and", no "or" → bare comparison
-      intro h_cmp
-      right; right; exact h_cmp
+        · rename_i l; dsimp only []
+          split
+          · simp
+          · rename_i r; intro h; cases h
+            right; left; exact ⟨_, _, _, h_and, ‹_›, ‹_›, rfl⟩
+      · split
+        · rename_i idx h_or
+          split
+          · simp
+          · rename_i l; dsimp only []
+            split
+            · simp
+            · rename_i r; intro h; cases h
+              right; right; left; exact ⟨_, _, _, h_or, ‹_›, ‹_›, rfl⟩
+        · intro h_cmp; right; right; right; exact h_cmp
+  · -- tokens[0]! ≠ "each" → standard and/or/cmp path
+    split
+    · rename_i idx h_and
+      split
+      · simp
+      · rename_i l; dsimp only []
+        split
+        · simp
+        · rename_i r; intro h; cases h
+          right; left; exact ⟨_, _, _, h_and, ‹_›, ‹_›, rfl⟩
+    · split
+      · rename_i idx h_or
+        split
+        · simp
+        · rename_i l; dsimp only []
+          split
+          · simp
+          · rename_i r; intro h; cases h
+            right; right; left; exact ⟨_, _, _, h_or, ‹_›, ‹_›, rfl⟩
+      · intro h_cmp; right; right; right; exact h_cmp

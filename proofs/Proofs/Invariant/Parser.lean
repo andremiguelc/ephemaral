@@ -215,10 +215,65 @@ def parseCmpExpr (tokens : List String) (root : String) : Option BoolExpr := do
   let rhs ← parseExpr rhsTokens root
   pure (.cmp op lhs rhs)
 
+/-- Find the index of a comparison operator in item-scoped tokens. -/
+def findItemCompOpIdx (tokens : List String) : Option Nat :=
+  tokens.findIdx? fun t => compOpTokens.contains t
+
+/-- Parse a comparison over item fields (bare names, no root prefix). -/
+def parseItemCmpExpr (tokens : List String) : Option BoolExpr := do
+  let opIdx ← findItemCompOpIdx tokens
+  let op ← parseOp tokens[opIdx]!
+  let lhs ← parseItemBodyExpr (tokens.take opIdx)
+  let rhs ← parseItemBodyExpr (tokens.drop (opIdx + 1))
+  pure (.cmp op lhs rhs)
+
+/-- Parse a boolean expression over item fields.
+    Splits on `and`/`or` connectives, then parses each half as a comparison.
+    Item fields are bare names (no root prefix). -/
+partial def parseItemBoolExpr (tokens : List String) : Option BoolExpr := do
+  match tokens.findIdx? (· == "and") with
+  | some idx =>
+    let left ← parseItemCmpExpr (tokens.take idx)
+    let right ← parseItemBoolExpr (tokens.drop (idx + 1))
+    pure (.logic .and left right)
+  | none =>
+    match tokens.findIdx? (· == "or") with
+    | some idx =>
+      let left ← parseItemCmpExpr (tokens.take idx)
+      let right ← parseItemBoolExpr (tokens.drop (idx + 1))
+      pure (.logic .or left right)
+    | none => parseItemCmpExpr tokens
+
+/-- Parse an each expression from tokens starting after "each".
+    Expects: "(" collection "," body-bool-tokens ")"
+    Returns the eachExpr BoolExpr. -/
+def parseEachExpr (tokens : List String) (root : String) : Option BoolExpr := do
+  guard (tokens.length >= 5)
+  guard (tokens[0]! == "(")
+  let commaIdx ← tokens.findIdx? (· == ",")
+  -- Find matching close paren (last ")" at depth 0)
+  let closeIdx ← tokens.findIdx? (· == ")")
+  guard (closeIdx > commaIdx)
+  let collTokens := tokens.toArray[1:commaIdx].toArray.toList
+  guard (collTokens.length == 1)
+  let collStr := collTokens[0]!
+  let collParts := collStr.splitOn "."
+  guard (collParts.length == 2)
+  guard (collParts[0]! == root)
+  let collRef := FieldRef.simple collParts[1]!
+  let bodyTokens := tokens.toArray[commaIdx + 1:closeIdx].toArray.toList
+  guard (!bodyTokens.isEmpty)
+  let body ← parseItemBoolExpr bodyTokens
+  pure (.eachExpr collRef body)
+
 /-- Parse a boolean expression from tokens.
-    Splits on `and` / `or` first (lowest precedence), then parses each
-    half as a comparison. Supports exactly two operands per connective. -/
+    Checks for `each` first (must be before and/or splitting since each body can contain and/or),
+    then splits on `and` / `or` (lowest precedence), then parses each half as a comparison. -/
 def parseBoolExpr (tokens : List String) (root : String) : Option BoolExpr := do
+  -- Check for each(...) — must come before and/or splitting
+  if tokens[0]! == "each" then
+    if let some eachE := parseEachExpr (tokens.drop 1) root then
+      return eachE
   match tokens.findIdx? (· == "and") with
   | some idx =>
     let left ← parseCmpExpr (tokens.take idx) root
