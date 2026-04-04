@@ -256,6 +256,50 @@ No hardcoded bound — the collection length is symbolic. Z3 explores different 
 
 **Lean proof:** `compileInvExpr_preserves` handles `sumExpr` with `congr 1` + `funext` + recursive application — both sides share the same `sumN` structure, so the proof reduces to showing per-item body compilation is correct. Function-side proof has 2 sorry's: the assumption that collection-indexed names never appear in `inputFields` — true by naming convention but needs a formal precondition.
 
+### `each` — Universal Quantifier over Collections
+
+**Status:** ✓ Proved (invariant + function + render + parser)
+
+Assert that a boolean predicate holds for every item in a collection. The boolean analog of `sum` — same recursion scheme, same item environment, different algebra (`Bool/∧/true` instead of `Rat/+/0`).
+
+```
+each(<root>.<collection>, <per-item predicate>)
+```
+
+```
+invariant items_positive:
+  record.total == sum(record.items, amount)
+
+invariant all_items_valid:
+  each(record.items, value > 0 and value <= 1000)
+```
+
+`each(record.items, value > 0)` reads as: "for every item in `items`, `value > 0`." The body is a `BoolExpr` (comparison, `and`/`or`, or nested `each`), not a numeric `Expr`.
+
+**SMT-LIB encoding:**
+
+```smt2
+(declare-fun items-value (Int) Real)
+(declare-const items-len Int)
+(assert (>= items-len 0))
+(define-fun-rec each-items ((i Int)) Bool
+  (ite (<= i 0) true
+    (and (> (items-value (- i 1)) 0.0)
+         (each-items (- i 1)))))
+```
+
+Same `define-fun-rec` strategy as `sum`. Base case `true`, combiner `and`, return sort `Bool`.
+
+**Constraints:**
+- Body is a boolean predicate (comparisons + `and`/`or`)
+- Item fields are bare names — scoped by accessor functions
+- No `any` keyword yet — expressible as `not each(coll, not P)`
+- No `count` keyword — expressible as `sum(coll, 1)`
+
+**Function verification:** Same pass-through model as `sum`. Collections not modified by the function reuse input accessor functions for the output invariant.
+
+**Lean proof:** `compileInvBoolExpr_preserves` handles `eachExpr` with `congr 1` + `funext` + recursive application on `allN` — structurally identical to the `sumExpr` proof in `compileInvExpr_preserves`. Function-side proof uses the same `CollectionSafe` + `CollectionPassthrough` preconditions.
+
 ---
 
 ## Verification Workflow
