@@ -29,6 +29,8 @@ mutual
     | .cmp op l r   => .cmp op (prefixSmtExpr pfx l) (prefixSmtExpr pfx r)
     | .logic op l r => .logic op (prefixSmtBoolExpr pfx l) (prefixSmtBoolExpr pfx r)
     | .neg b        => .neg (prefixSmtBoolExpr pfx b)
+    | .eachExpr collKey body => .eachExpr (pfx ++ collKey) body
+      -- Body fields stay bare — same as sumExpr.
 end
 
 /-- Build an SMT-LIB implication guard for optional fields.
@@ -66,6 +68,11 @@ mutual
     | .cmp op l r   => .cmp op (rewriteCollections rewrites l) (rewriteCollections rewrites r)
     | .logic op l r => .logic op (rewriteBoolCollections rewrites l) (rewriteBoolCollections rewrites r)
     | .neg b        => .neg (rewriteBoolCollections rewrites b)
+    | .eachExpr collKey body =>
+      let newKey := match rewrites.find? (·.1 == collKey) with
+        | some (_, replacement) => replacement
+        | none => collKey
+      .eachExpr newKey body
 end
 
 def renderVerification (funFrag : CompiledFunction) (invFrags : List CompiledInvariant)
@@ -73,21 +80,32 @@ def renderVerification (funFrag : CompiledFunction) (invFrags : List CompiledInv
     (optionalFields : List String := []) : String :=
   let header := s!"; Ephemaral — Function verification: {funName}"
 
-  -- Detect collections from invariant fragments (find sumExpr nodes)
+  -- Detect collections from invariant fragments (find sumExpr and eachExpr nodes)
   let inputSumDefs := invFrags.flatMap fun frag =>
     collectSumBoolExprs (prefixSmtBoolExpr "in-" frag.body)
+  let inputEachDefs := invFrags.flatMap fun frag =>
+    collectEachBoolExprs (prefixSmtBoolExpr "in-" frag.body)
   -- All collections pass through (Scenario A: read-only collections)
   -- Output invariants reuse input accessor functions.
   -- Strip "in-" prefix (3 chars) from input collKey to get bare collection name
   let stripInPrefix (s : String) : String := (s.drop 3).toString
-  let collRewrites := inputSumDefs.map fun sd =>
-    ("out-" ++ stripInPrefix sd.collKey, sd.collKey)  -- "out-lineItems" → "in-lineItems"
+  let sumRewrites := inputSumDefs.map fun sd =>
+    ("out-" ++ stripInPrefix sd.collKey, sd.collKey)
+  let eachRewrites := inputEachDefs.map fun ed =>
+    ("out-" ++ stripInPrefix ed.collKey, ed.collKey)
+  let collRewrites := sumRewrites ++ eachRewrites
   -- Names declared by sum defs (to exclude from scalar const declarations).
   -- Include both in- and out- versions since pass-through collections reuse input accessors.
   let sumDeclaredNames := inputSumDefs.flatMap fun sd =>
     let baseName := stripInPrefix sd.collKey
     let inNames := [sd.collKey ++ "-len"] ++ (collectBodyConsts sd.body).eraseDups.map (sd.collKey ++ "-" ++ ·)
     let outNames := ["out-" ++ baseName ++ "-len"] ++ (collectBodyConsts sd.body).eraseDups.map ("out-" ++ baseName ++ "-" ++ ·)
+    inNames ++ outNames
+  -- Names declared by each defs
+  let eachDeclaredNames := inputEachDefs.flatMap fun ed =>
+    let baseName := stripInPrefix ed.collKey
+    let inNames := [ed.collKey ++ "-len"] ++ (collectBodyBoolConsts ed.body).eraseDups.map (ed.collKey ++ "-" ++ ·)
+    let outNames := ["out-" ++ baseName ++ "-len"] ++ (collectBodyBoolConsts ed.body).eraseDups.map ("out-" ++ baseName ++ "-" ++ ·)
     inNames ++ outNames
 
   -- 1. Constant declarations
@@ -99,12 +117,15 @@ def renderVerification (funFrag : CompiledFunction) (invFrags : List CompiledInv
   let paramPrecondConsts := paramPreconditions.foldl (fun acc frag => acc ++ frag.consts) []
   let funConsts := funFrag.inConsts ++ funFrag.outConsts ++ funFrag.paramConsts
   let allConsts := (funConsts ++ invConsts ++ paramPrecondConsts).eraseDups
-  -- Filter out collection-related names (declared by renderSumDef as Int/functions, not Real)
-  let scalarConsts := allConsts.filter fun c => !sumDeclaredNames.contains c
+  -- Filter out collection-related names (declared by renderSumDef/renderEachDef as Int/functions, not Real)
+  let collDeclaredNames := sumDeclaredNames ++ eachDeclaredNames
+  let scalarConsts := allConsts.filter fun c => !collDeclaredNames.contains c
   let constDecls := scalarConsts.map (fun c => s!"(declare-const {c} Real)")
 
   -- 1b. Collection declarations (accessor functions + define-fun-rec)
   let sumDecls := inputSumDefs.flatMap renderSumDef
+  let eachDecls := inputEachDefs.flatMap renderEachDef
+  let sumDecls := sumDecls ++ eachDecls
 
   -- 2. Unchanged field equalities
   --    Also include invariant-referenced fields not in the function's field set
@@ -115,10 +136,10 @@ def renderVerification (funFrag : CompiledFunction) (invFrags : List CompiledInv
     |>.filter (fun c => !funFrag.outConsts.contains c)
     |>.filter (fun c => !assignedFields.contains c)
     -- Also exclude collection-related names from scalar unchanged assertions
-    |>.filter (fun c => !sumDeclaredNames.contains c)
+    |>.filter (fun c => !collDeclaredNames.contains c)
     |>.map (fun outC => (outC, "in-" ++ (outC.drop 4).toString))
   let allUnchanged := (funFrag.unchangedEqs ++ extraUnchanged).filter fun (outC, _) =>
-    !sumDeclaredNames.contains outC
+    !collDeclaredNames.contains outC
   let unchangedAsserts := allUnchanged.map (fun (outC, inC) =>
     s!"(assert (= {outC} {inC}))")
 

@@ -109,6 +109,7 @@ mutual
     | .cmp _ l r   => collectSmtConsts l ++ collectSmtConsts r
     | .logic _ l r => collectSmtBoolConsts l ++ collectSmtBoolConsts r
     | .neg b       => collectSmtBoolConsts b
+    | .eachExpr collKey body => [collKey ++ "-len"] ++ collectSmtBoolConsts body
 end
 
 /-- Collect input field names used in assignment expressions. -/
