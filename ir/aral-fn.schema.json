@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ephemaral.com/aral-fn.schema.json",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "title": "Aral-fn",
   "description": "Function representation for ephemaral verification. Describes a pure data transformation: a function that takes a typed input (plus optional parameters) and returns the same type with some fields changed via spread-and-override. This is the proof boundary — everything before this format is unproved (parsers, LLMs), everything after is proved correct in Lean 4.",
   "type": "object",
@@ -200,7 +200,7 @@
       ]
     },
     "BoolExpr": {
-      "description": "A boolean expression used as a condition in if-then-else. Supports comparisons, boolean logic, negation, and field presence checks.",
+      "description": "A boolean expression used as a condition in if-then-else or as invariant body. Supports comparisons, boolean logic, negation, field presence checks, and universal quantification over collections.",
       "oneOf": [
         {
           "type": "object",
@@ -273,6 +273,29 @@
                 "qualifier": {
                   "type": "string",
                   "description": "Optional qualifier for qualified field access (e.g., typed parameter fields)."
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["each"],
+          "additionalProperties": false,
+          "properties": {
+            "each": {
+              "type": "object",
+              "required": ["collection", "body"],
+              "additionalProperties": false,
+              "description": "Universal quantifier over collection items. True when the body predicate holds for every item. Collection is a plain field name (always on the input type). Body is a per-item boolean predicate — field refs inside are item-scoped.",
+              "properties": {
+                "collection": {
+                  "type": "string",
+                  "description": "Collection field name on the input type (e.g., 'lineItems')."
+                },
+                "body": {
+                  "$ref": "#/$defs/BoolExpr",
+                  "description": "Per-item boolean predicate. Field refs are item-scoped (e.g., 'quantity', 'unitPrice')."
                 }
               }
             }
