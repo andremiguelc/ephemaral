@@ -51,6 +51,12 @@ def sumN (f : Nat → Rat) : Nat → Rat
   | 0     => 0
   | n + 1 => f n + sumN f n
 
+/-- Conjoin f(i) for i = 0..n-1. Boolean analog of sumN.
+    Used by both evalBoolExpr and evalSmtBoolExpr for `each`. -/
+def allN (f : Nat → Bool) : Nat → Bool
+  | 0     => true
+  | n + 1 => f n && allN f n
+
 /-- Build a per-item environment for collection items.
     Maps field name "x" to env("collKey-i-x") so the body expression
     evaluates in the context of the i-th collection item. -/
@@ -76,6 +82,10 @@ mutual
     | .logic op l r   => evalLogicOp op (evalBoolExpr env l) (evalBoolExpr env r)
     | .neg b          => !(evalBoolExpr env b)
     | .isPresent ref  => env ("has-" ++ ref.toKey) != 0
+    | .eachExpr coll body =>
+      let collKey := coll.toKey
+      let len := (env (collKey ++ "-len")).floor.toNat
+      allN (fun i => evalBoolExpr (itemEnvAt env collKey i) body) len
 end
 
 mutual
@@ -93,6 +103,9 @@ mutual
     | .cmp op l r   => evalCompOp op (evalSmtExpr env l) (evalSmtExpr env r)
     | .logic op l r => evalLogicOp op (evalSmtBoolExpr env l) (evalSmtBoolExpr env r)
     | .neg b        => !(evalSmtBoolExpr env b)
+    | .eachExpr collKey body =>
+      let len := (env (collKey ++ "-len")).floor.toNat
+      allN (fun i => evalSmtBoolExpr (itemEnvAt env collKey i) body) len
 end
 
 /-- Evaluate an Invariant's body in an environment. -/
