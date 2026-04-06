@@ -33,7 +33,7 @@ def extractBlockRoot (block : String) : Option String :=
   let lines := cleanLines block
   if lines.length ≥ 2 then
     let bodyLine := lines[1]!
-    let tokens := bodyLine.splitOn " " |>.filter (!·.isEmpty)
+    let tokens := tokenize bodyLine
     extractRoot tokens
   else none
 
@@ -109,6 +109,7 @@ mutual
     | .cmp _ l r   => collectSmtConsts l ++ collectSmtConsts r
     | .logic _ l r => collectSmtBoolConsts l ++ collectSmtBoolConsts r
     | .neg b       => collectSmtBoolConsts b
+    | .eachExpr collKey body => [collKey ++ "-len"] ++ collectSmtBoolConsts body
 end
 
 /-- Collect input field names used in assignment expressions. -/
@@ -183,8 +184,8 @@ def resolveParamPreconditions (funRepr : FunctionRepr) (frags : List CompiledInv
           consts := frag.consts.map (pfx ++ ·) }
       | none => none
 
-/-- Extract invariant names from blocks that failed to compile (for skip reporting). -/
-private def extractSkippedNames (blocks : List String) : List String :=
+/-- Extract invariant names + skip reasons from blocks that failed to compile. -/
+private def extractSkippedInfo (blocks : List String) : List (String × String) :=
   blocks.filter (fun b => (tryCompileBlock b).isNone)
     |>.filterMap fun block =>
       let lines := cleanLines block
@@ -193,7 +194,7 @@ private def extractSkippedNames (blocks : List String) : List String :=
         if l.startsWith "invariant " then
           let afterPrefix := (l.drop 10).trimAscii.toString
           if afterPrefix.endsWith ":" then
-            some (afterPrefix.dropEnd 1).toString
+            some ((afterPrefix.dropEnd 1).toString, diagnoseSkipReason block)
           else none
         else none
       | none => none
@@ -249,11 +250,13 @@ def verifyFunction (funRepr : FunctionRepr) (invariantBlocks : List String)
   let funRepr := { funRepr with
     inputFields := augmentFields funRepr.inputFields funRepr.params invConsts }
 
-  -- Detect skipped invariants (unsupported syntax)
-  let allSkippedNames := extractSkippedNames inputBlocks ++ extractSkippedNames paramBlocks
-  let skipWarning := if allSkippedNames.isEmpty then none
-    else some (s!"Skipped {allSkippedNames.length} invariant(s) with unsupported syntax: " ++
-      ", ".intercalate allSkippedNames)
+  -- Detect skipped invariants (unsupported syntax) with specific reasons
+  let allSkippedInfo := extractSkippedInfo inputBlocks ++ extractSkippedInfo paramBlocks
+  let skipWarning := if allSkippedInfo.isEmpty then none
+    else
+      let lines := allSkippedInfo.map fun (name, reason) => s!"  {name}: {reason}"
+      some (s!"Skipped {allSkippedInfo.length} invariant(s) with unsupported syntax:\n" ++
+        "\n".intercalate lines)
 
   -- Route warning for unmatched roots
   let routeWarning := if skippedRoots.isEmpty then none
@@ -289,6 +292,30 @@ def verifyFunction (funRepr : FunctionRepr) (invariantBlocks : List String)
 
   -- Layer 1: compile and render
   let funFrag := compileFun funRepr
+
+  -- Warn about collections used in function body but not referenced by any rule
+  let funBodyCollKeys := funFrag.assignDefs.flatMap (fun (_, expr) =>
+    (collectSumExprs expr).map (·.collKey) ++ (collectEachExprs expr).map (·.collKey))
+    |>.eraseDups
+  let invCollKeys := (relevantFrags.flatMap fun frag =>
+    let prefixed := prefixSmtBoolExpr "in-" frag.body
+    (collectSumBoolExprs prefixed).map (·.collKey) ++
+    (collectEachBoolExprs prefixed).map (·.collKey))
+    |>.eraseDups
+  let unreferencedColls := funBodyCollKeys.filter (fun c => !invCollKeys.contains c)
+    |>.map (fun s => if s.startsWith "in-" then (s.drop 3).toString else s)
+  let collWarning := if unreferencedColls.isEmpty then none
+    else some (
+      "Note: the function computes over " ++
+      ", ".intercalate (unreferencedColls.map (s!"'{·}'")) ++
+      " but no rule references " ++
+      (if unreferencedColls.length == 1 then "this collection." else "these collections.") ++
+      " Verification will check the function against the provided rules only.")
+  let combinedWarning := match (combinedWarning, collWarning) with
+    | (some w, some cw) => some (w ++ "\n" ++ cw)
+    | (none, some cw) => some cw
+    | (w, none) => w
+
   let smt := renderVerification funFrag relevantFrags funRepr.name relevantParamFrags funRepr.optionalFields
   -- Collect constrained param identifiers:
   --   Scalar: the param name itself (e.g., "discountAmount")
@@ -336,7 +363,7 @@ def verifyAndDiagnose (funRepr : FunctionRepr) (invariantBlocks : List String)
   IO.FS.writeFile tmpPath ctx.smt
   let z3out ← IO.Process.output {
     cmd := "z3"
-    args := #[tmpPath]
+    args := #["-T:10", tmpPath]
   }
 
   -- Parse Z3 output
@@ -365,9 +392,40 @@ def verifyAndDiagnose (funRepr : FunctionRepr) (invariantBlocks : List String)
     pure (formatDiagnosticReport diagInput)
   | "unsat" =>
     pure (formatVerified diagInput)
-  | other =>
-    let msg := if z3out.stderr.isEmpty then "" else s!"\nZ3 stderr: {z3out.stderr}"
-    pure s!"Z3 returned unexpected result: {other}{msg}"
+  | "timeout" =>
+    let debugHint := if debug then "" else " Run with --debug for more detail."
+    pure ("\n".intercalate [
+      "INCOMPLETE VERIFICATION",
+      "",
+      s!"Function: {ctx.funName}",
+      "",
+      "Verification could not complete within the time limit. This typically happens when",
+      "per-item rules (each) and aggregate computations (sum) interact on the same",
+      "collection — the verification engine needs to reason about every possible",
+      "collection size simultaneously, which can exceed its capabilities.",
+      "",
+      "--- What to do ---",
+      "  1. If per-item and aggregate rules can stand alone, try splitting them",
+      "     into separate .aral files and verifying each independently",
+      "  2. If the rules genuinely need to be together (the aggregate depends on",
+      "     per-item constraints), this is a current limitation — the engine",
+      "     cannot yet prove properties that require relating per-item guarantees",
+      "     to aggregate outcomes",
+      s!"  3. If the problem persists, run with --debug and report the issue{debugHint}"
+    ])
+  | _other =>
+    let debugHint := if debug then "" else " Run with --debug for more detail."
+    pure ("\n".intercalate [
+      "INCOMPLETE VERIFICATION",
+      "",
+      s!"Function: {ctx.funName}",
+      s!"Verification could not be completed for this function and rules combination.{debugHint}",
+      "",
+      "--- What to do ---",
+      "  1. Check that field names in your rules match the function's input fields",
+      "  2. Try simplifying — split collection rules (sum, each) into separate .aral files",
+      "  3. If the problem persists, run with --debug and report the issue"
+    ])
   let warningSection := match warnings with
     | some w => w ++ "\n\n"
     | none => ""

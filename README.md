@@ -99,6 +99,7 @@ Supported constructs in function bodies:
 - Typed parameter preconditions (invariants on parameter types applied automatically)
 - Null-safe field access (nullable fields with defaults)
 - Collection sums (reduce-to-sum patterns)
+- Collection predicates (universal quantifier — every item satisfies a condition)
 
 This covers approximately 78% of CRUD functions across 6 surveyed production codebases.
 
@@ -141,6 +142,35 @@ pytest proofs/tests/ -v
 # Schema validation tests
 pytest ir/tests/ -v
 ```
+
+## CI and Releases
+
+### Continuous integration
+
+Every push runs the CI workflow (`.github/workflows/ci.yml`), which builds the full Lean project and confirms all proofs compile with zero sorry's.
+
+### Releasing a new version
+
+Releases are triggered by pushing a version tag. The release workflow (`.github/workflows/release.yml`) builds binaries for Linux x86_64 and macOS arm64 and attaches them to a GitHub Release.
+
+```bash
+# 1. Merge your branch into main
+git checkout main
+git merge <branch>
+
+# 2. Tag the release
+git tag v<version>
+
+# 3. Push (tag triggers the release workflow)
+git push origin main --tags
+```
+
+GitHub Actions will:
+1. Build the `ephemaral` executable on both platforms via `lake build`
+2. Create a GitHub Release with auto-generated release notes
+3. Attach the binaries (`ephemaral-linux-x86_64`, `ephemaral-macos-arm64`)
+
+Users can then download the binary from the [Releases page](https://github.com/andremiguelc/ephemaral/releases).
 
 ## License
 

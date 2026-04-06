@@ -86,7 +86,7 @@ def runCompile (aralPaths : List String) : IO Unit := do
   for path in aralPaths do
     let text ← IO.FS.readFile path
     let blocks := splitBlocks text
-    -- Report skipped invariants
+    -- Report skipped invariants with specific diagnostics
     let skipped := blocks.filter fun block => (tryCompileBlock block).isNone
     for block in skipped do
       let name := block.splitOn "\n"
@@ -95,7 +95,8 @@ def runCompile (aralPaths : List String) : IO Unit := do
         |>.head?
         |>.map (fun s => ((s.drop 10).trimAscii.toString.dropEnd 1).toString)
         |>.getD "unknown"
-      IO.eprintln s!"; [skipped] {name} — not yet supported"
+      let reason := diagnoseSkipReason block
+      IO.eprintln s!"; [skipped] {name} — {reason}"
     allBlocks := allBlocks ++ blocks
   match compileFileToSmt allBlocks with
   | some smt => IO.println smt

@@ -1,0 +1,7 @@
+{
+  "name": "identity",
+  "inputType": "Record",
+  "inputFields": ["value"],
+  "params": [],
+  "assigns": []
+}

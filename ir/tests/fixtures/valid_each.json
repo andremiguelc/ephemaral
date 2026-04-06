@@ -1,0 +1,44 @@
+{
+  "name": "validateOrder",
+  "inputType": "Order",
+  "inputFields": [
+    "total",
+    "status"
+  ],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "status",
+      "value": {
+        "ite": {
+          "cond": {
+            "each": {
+              "collection": "lineItems",
+              "body": {
+                "logic": {
+                  "op": "and",
+                  "left": {
+                    "cmp": {
+                      "op": "gt",
+                      "left": { "field": { "name": "quantity" } },
+                      "right": { "lit": 0 }
+                    }
+                  },
+                  "right": {
+                    "cmp": {
+                      "op": "gte",
+                      "left": { "field": { "name": "unitPrice" } },
+                      "right": { "lit": 0 }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "then": { "lit": 1 },
+          "else": { "lit": 0 }
+        }
+      }
+    }
+  ]
+}

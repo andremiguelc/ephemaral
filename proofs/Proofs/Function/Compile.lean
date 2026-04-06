@@ -43,6 +43,8 @@ mutual
                          then SmtExpr.const (inField presKey)
                          else SmtExpr.const presKey
         .cmp .neq smtConst (.lit 0)
+    | .eachExpr coll body =>
+      .eachExpr (inField coll.toKey) (compileInvBoolExpr body)
 end
 
 /-- Compute the list of fields unchanged by the function (spread fields).

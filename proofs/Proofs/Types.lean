@@ -51,6 +51,7 @@ mutual
     | logic     (op : LogicOp) (l r : BoolExpr)
     | neg       (inner : BoolExpr)
     | isPresent (ref : FieldRef)
+    | eachExpr  (collection : FieldRef) (body : BoolExpr)
 end
 
 deriving instance Repr for Expr
@@ -74,9 +75,10 @@ mutual
     | sumExpr   (collKey : String) (body : SmtExpr)
 
   inductive SmtBoolExpr where
-    | cmp   (op : CompOp) (l r : SmtExpr)
-    | logic (op : LogicOp) (l r : SmtBoolExpr)
-    | neg   (inner : SmtBoolExpr)
+    | cmp      (op : CompOp) (l r : SmtExpr)
+    | logic    (op : LogicOp) (l r : SmtBoolExpr)
+    | neg      (inner : SmtBoolExpr)
+    | eachExpr (collKey : String) (body : SmtBoolExpr)
 end
 
 deriving instance Repr for SmtExpr
