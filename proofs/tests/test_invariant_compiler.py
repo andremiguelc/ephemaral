@@ -97,22 +97,29 @@ class TestComments:
 
 
 # ============================================================
-# Unsupported constructs
+# Each (universal quantifier over collections)
 # ============================================================
 
-class TestUnsupportedConstructs:
-    def test_skip_reported(self):
-        """Unsupported invariants should be skipped with a message on stderr."""
-        result = run_aral_compile("skip_each.aral")
-        assert result.returncode == 0
-        assert "[skipped]" in result.stderr
-        assert "line_items_positive" in result.stderr
+class TestEach:
+    def test_each_basic(self):
+        out = compile_fixture("each_basic.aral")
+        assert "each-lineItems" in out
+        assert "define-fun-rec" in out
+        assert "inv-items-positive" in out
 
-    def test_compilable_still_works(self):
-        """Compilable invariants in the same file should still compile."""
+    def test_each_logic(self):
+        out = compile_fixture("each_logic.aral")
+        assert "each-lineItems" in out
+        assert "(and" in out
+        assert "inv-items-valid" in out
+
+    def test_each_with_scalar(self):
+        """File with both scalar and each invariants should compile both."""
         out = compile_fixture("skip_each.aral")
         assert "(>= total 0.0)" in out
         assert "inv-total-non-negative" in out
+        assert "each-lineItems" in out
+        assert "inv-line-items-positive" in out
 
 
 # ============================================================

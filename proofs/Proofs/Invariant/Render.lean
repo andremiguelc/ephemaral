@@ -81,6 +81,10 @@ mutual
       s!"({logicOpToSmt op} {renderSmtBoolExpr l} {renderSmtBoolExpr r})"
     | .neg b =>
       s!"(not {renderSmtBoolExpr b})"
+    | .eachExpr collKey _body =>
+      let fnName := "each-" ++ collKey
+      let lenConst := collKey ++ "-len"
+      s!"({fnName} {lenConst})"
 end
 
 -- Collection rendering support
@@ -118,6 +122,8 @@ mutual
       s!"({logicOpToSmt op} {renderSmtBoolExprIndexed collKey idxVar l} {renderSmtBoolExprIndexed collKey idxVar r})"
     | .neg b =>
       s!"(not {renderSmtBoolExprIndexed collKey idxVar b})"
+    | .eachExpr nestedCollKey _body =>
+      s!"(each-{nestedCollKey} {nestedCollKey}-len)"
 end
 
 /-- A sum definition extracted from an SmtExpr tree. -/
@@ -141,6 +147,7 @@ mutual
     | .cmp _ l r   => collectSumExprs l ++ collectSumExprs r
     | .logic _ l r => collectSumBoolExprs l ++ collectSumBoolExprs r
     | .neg b       => collectSumBoolExprs b
+    | .eachExpr _collKey body => collectSumBoolExprs body
 end
 
 mutual
@@ -156,6 +163,7 @@ mutual
     | .cmp _ l r   => collectBodyConsts l ++ collectBodyConsts r
     | .logic _ l r => collectBodyBoolConsts l ++ collectBodyBoolConsts r
     | .neg b       => collectBodyBoolConsts b
+    | .eachExpr _collKey body => collectBodyBoolConsts body
 end
 
 /-- Render a SumDef as SMT-LIB declarations + define-fun-rec. -/
@@ -172,6 +180,44 @@ def renderSumDef (sd : SumDef) : List String :=
   -- the recursive function
   let bodyStr := renderSmtExprIndexed sd.collKey idxVar sd.body
   let recDef := s!"(define-fun-rec {fnName} (({idxVar} Int)) Real\n  (ite (<= {idxVar} 0) 0.0\n    (+ {bodyStr}\n       ({fnName} (- {idxVar} 1)))))"
+  accessorDecls ++ [lenDecl, lenAssert, recDef]
+
+/-- An each definition extracted from an SmtBoolExpr tree. -/
+structure EachDef where
+  collKey : String
+  body    : SmtBoolExpr
+  deriving Repr
+
+mutual
+  /-- Collect all eachExpr nodes from an SmtExpr (recurse into condExpr booleans). -/
+  def collectEachExprs : SmtExpr → List EachDef
+    | .lit _            => []
+    | .const _          => []
+    | .arith _ l r      => collectEachExprs l ++ collectEachExprs r
+    | .condExpr c t e   => collectEachBoolExprs c ++ collectEachExprs t ++ collectEachExprs e
+    | .roundExpr _ e    => collectEachExprs e
+    | .sumExpr _collKey body => collectEachExprs body
+
+  /-- Collect all eachExpr nodes from an SmtBoolExpr. -/
+  def collectEachBoolExprs : SmtBoolExpr → List EachDef
+    | .cmp _ l r   => collectEachExprs l ++ collectEachExprs r
+    | .logic _ l r => collectEachBoolExprs l ++ collectEachBoolExprs r
+    | .neg b       => collectEachBoolExprs b
+    | .eachExpr collKey body => [⟨collKey, body⟩] ++ collectEachBoolExprs body
+end
+
+/-- Render an EachDef as SMT-LIB declarations + define-fun-rec.
+    Boolean analog of renderSumDef: return sort Bool, base case true, combiner and. -/
+def renderEachDef (ed : EachDef) : List String :=
+  let fields := (collectBodyBoolConsts ed.body).eraseDups
+  let fnName := "each-" ++ ed.collKey
+  let idxVar := "i"
+  let accessorDecls := fields.map fun f =>
+    s!"(declare-fun {ed.collKey}-{f} (Int) Real)"
+  let lenDecl := s!"(declare-const {ed.collKey}-len Int)"
+  let lenAssert := s!"(assert (>= {ed.collKey}-len 0))"
+  let bodyStr := renderSmtBoolExprIndexed ed.collKey idxVar ed.body
+  let recDef := s!"(define-fun-rec {fnName} (({idxVar} Int)) Bool\n  (ite (<= {idxVar} 0) true\n    (and {bodyStr}\n         ({fnName} (- {idxVar} 1)))))"
   accessorDecls ++ [lenDecl, lenAssert, recDef]
 
 /-- Render a single CompiledInvariant as SMT-LIB text (standalone). -/
@@ -194,14 +240,24 @@ def renderSmtFile (frags : List CompiledInvariant) : String :=
   let rawSumDefs := (frags.flatMap fun frag => collectSumBoolExprs frag.body)
   let sumDefs := rawSumDefs.foldl (fun acc sd =>
     if acc.any (·.collKey == sd.collKey) then acc else acc ++ [sd]) []
+  -- Collect each definitions from all fragments (dedup by collKey)
+  let rawEachDefs := (frags.flatMap fun frag => collectEachBoolExprs frag.body)
+  let eachDefs := rawEachDefs.foldl (fun acc ed =>
+    if acc.any (·.collKey == ed.collKey) then acc else acc ++ [ed]) []
   -- Constants declared by sum defs (len + body fields) — exclude from regular decls
   let sumDeclaredConsts : List String := sumDefs.flatMap fun sd =>
     [sd.collKey ++ "-len"] ++ (collectBodyConsts sd.body).eraseDups.map (sd.collKey ++ "-" ++ ·)
-  -- Collect and deduplicate all constants across fragments, excluding sum-declared ones
+  -- Constants declared by each defs (len + body fields) — exclude from regular decls
+  let eachDeclaredConsts : List String := eachDefs.flatMap fun ed =>
+    [ed.collKey ++ "-len"] ++ (collectBodyBoolConsts ed.body).eraseDups.map (ed.collKey ++ "-" ++ ·)
+  let collDeclaredConsts := sumDeclaredConsts ++ eachDeclaredConsts
+  -- Collect and deduplicate all constants across fragments, excluding collection-declared ones
   let allConsts : List String := (frags.flatMap (·.consts)).eraseDups
-  let scalarConsts := allConsts.filter fun c => !sumDeclaredConsts.contains c
+  let scalarConsts := allConsts.filter fun c => !collDeclaredConsts.contains c
   let constDecls := scalarConsts.map (fun c => s!"(declare-const {c} Real)")
   let sumDecls := sumDefs.flatMap renderSumDef
+  let eachDecls := eachDefs.flatMap renderEachDef
+  let collDecls := (sumDecls ++ eachDecls).eraseDups
   -- Render each invariant as a define-fun
   let defFuns := frags.map fun frag =>
     let body := renderSmtBoolExpr frag.body
@@ -214,7 +270,7 @@ def renderSmtFile (frags : List CompiledInvariant) : String :=
   let sections := [header]
     ++ [""]
     ++ constDecls
-    ++ (if sumDecls.isEmpty then [] else [""] ++ sumDecls)
+    ++ (if collDecls.isEmpty then [] else [""] ++ collDecls)
     ++ [""]
     ++ defFuns
     ++ [""]

@@ -69,6 +69,17 @@ mutual
     | .neg inner =>
       simp [evalSmtBoolExpr, prefixSmtBoolExpr]
       rw [prefixSmtBoolExpr_preserves env pfx inner]
+    | .eachExpr collKey body =>
+      simp only [evalSmtBoolExpr, prefixSmtBoolExpr]
+      have hLen : (env ((pfx ++ collKey) ++ "-len")).floor.toNat
+                = ((fun name => env (pfx ++ name)) (collKey ++ "-len")).floor.toNat := by
+        simp only [String.append_assoc]
+      have hItem : ∀ i, itemEnvAt env (pfx ++ collKey) i
+                     = itemEnvAt (fun name => env (pfx ++ name)) collKey i := by
+        intro i; funext name; simp only [itemEnvAt, String.append_assoc]
+      rw [hLen]
+      congr 1
+      funext i; rw [hItem]
 end
 
 -- Collection rewriting preservation
@@ -143,6 +154,21 @@ mutual
     | .neg inner =>
       simp [evalSmtBoolExpr, rewriteBoolCollections]
       rw [rewriteBoolCollections_preserves env rewrites inner h_equiv]
+    | .eachExpr collKey body =>
+      simp only [evalSmtBoolExpr, rewriteBoolCollections]
+      split
+      · rename_i old new h_find
+        have h_in := List.mem_of_find?_eq_some h_find
+        have h_pred := List.find?_some h_find
+        have h_eq : old = collKey := by rwa [beq_iff_eq] at h_pred
+        have h_suf := fun suffix => h_eq ▸ h_equiv old new h_in suffix
+        congr 1
+        · funext i; congr 1; funext name; simp only [itemEnvAt]
+          have := (h_suf ("-" ++ toString i ++ "-" ++ name)).symm
+          simp only [String.append_assoc] at this ⊢
+          exact this
+        · exact congrArg (fun x => x.floor.toNat) (h_suf "-len").symm
+      · rfl
 end
 
 -- Operator mapping contracts

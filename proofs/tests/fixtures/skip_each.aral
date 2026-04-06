@@ -2,7 +2,6 @@
 invariant total_non_negative:
   order.total >= 0
 
-# Each line item must have positive quantity (NOT compilable — uses 'each')
+# Each line item must have positive quantity (now compilable with each())
 invariant line_items_positive:
-  each item in order.lineItems:
-    item.quantity > 0
+  each(order.lineItems, quantity > 0)

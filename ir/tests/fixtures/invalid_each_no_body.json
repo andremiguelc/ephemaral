@@ -1,0 +1,22 @@
+{
+  "name": "badEach",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "total",
+      "value": {
+        "ite": {
+          "cond": {
+            "each": {
+              "collection": "lineItems"
+            }
+          },
+          "then": { "lit": 1 },
+          "else": { "lit": 0 }
+        }
+      }
+    }
+  ]
+}
