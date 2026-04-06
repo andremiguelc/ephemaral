@@ -363,7 +363,7 @@ def verifyAndDiagnose (funRepr : FunctionRepr) (invariantBlocks : List String)
   IO.FS.writeFile tmpPath ctx.smt
   let z3out ← IO.Process.output {
     cmd := "z3"
-    args := #[tmpPath]
+    args := #["-T:10", tmpPath]
   }
 
   -- Parse Z3 output
@@ -392,10 +392,31 @@ def verifyAndDiagnose (funRepr : FunctionRepr) (invariantBlocks : List String)
     pure (formatDiagnosticReport diagInput)
   | "unsat" =>
     pure (formatVerified diagInput)
+  | "timeout" =>
+    let debugHint := if debug then "" else " Run with --debug for more detail."
+    pure ("\n".intercalate [
+      "INCOMPLETE VERIFICATION",
+      "",
+      s!"Function: {ctx.funName}",
+      "",
+      "Verification could not complete within the time limit. This typically happens when",
+      "per-item rules (each) and aggregate computations (sum) interact on the same",
+      "collection — the verification engine needs to reason about every possible",
+      "collection size simultaneously, which can exceed its capabilities.",
+      "",
+      "--- What to do ---",
+      "  1. If per-item and aggregate rules can stand alone, try splitting them",
+      "     into separate .aral files and verifying each independently",
+      "  2. If the rules genuinely need to be together (the aggregate depends on",
+      "     per-item constraints), this is a current limitation — the engine",
+      "     cannot yet prove properties that require relating per-item guarantees",
+      "     to aggregate outcomes",
+      s!"  3. If the problem persists, run with --debug and report the issue{debugHint}"
+    ])
   | _other =>
     let debugHint := if debug then "" else " Run with --debug for more detail."
     pure ("\n".intercalate [
-      "VERIFICATION INCOMPLETE",
+      "INCOMPLETE VERIFICATION",
       "",
       s!"Function: {ctx.funName}",
       s!"Verification could not be completed for this function and rules combination.{debugHint}",
