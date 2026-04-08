@@ -251,7 +251,7 @@ def validateFunctionRepr (f : FunctionRepr) : Except String FunctionRepr := do
     let refs := collectExprFields a.value
     for ref in refs do
       unless knownNames.contains ref do
-        .error s!"in assignment to '{a.fieldName}': field reference '{ref}' is not in inputFields {f.inputFields} or params {f.params}"
+        .error s!"in assignment to '{a.fieldName}': found '{a.fieldName}: {ref}' but '{ref}' is not a known input or parameter. If this is a local variable, the parser couldn't resolve its declaration. Known: inputFields={f.inputFields}, params={f.params}"
   .ok f
 
 /-- Read, parse, and validate an Aral-fn JSON file into a FunctionRepr. -/
