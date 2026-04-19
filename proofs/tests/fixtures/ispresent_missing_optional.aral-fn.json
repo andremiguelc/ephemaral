@@ -1,0 +1,18 @@
+{
+  "name": "setValue",
+  "inputType": "Record",
+  "inputFields": ["value", "bonus"],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "value",
+      "value": {
+        "ite": {
+          "cond": { "isPresent": { "name": "bonus" } },
+          "then": { "field": { "name": "bonus" } },
+          "else": { "lit": 0 }
+        }
+      }
+    }
+  ]
+}

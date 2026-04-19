@@ -203,6 +203,21 @@ class TestNullableRuleConflict:
         assert "total" in out
 
 
+class TestIsPresentMissingOptional:
+    def test_ispresent_without_optional_fields(self):
+        """isPresent(field) with field not in optionalFields — rejected at deserialization
+        with an actionable error message naming the field and pointing to optionalFields."""
+        out = _run_and_snapshot(
+            "ispresent_missing_optional.aral-fn.json",
+            "ispresent_missing_optional.aral",
+            "ispresent_missing_optional",
+        )
+        assert "isPresent" in out
+        assert "optionalFields" in out
+        # The error identifies the offending field by name (dynamic, not hardcoded):
+        assert "bonus" in out
+
+
 # ============================================================
 # SUM / COLLECTION — M5 diagnostics
 # ============================================================
