@@ -123,6 +123,21 @@ class TestEach:
 
 
 # ============================================================
+# ite inside sum body — conditional aggregation
+# ============================================================
+
+class TestIteInSumBody:
+    def test_ite_in_sum_body_compiles(self):
+        """`sum(order.items, ite(active > 0, value, 0))` must parse and
+        compile into a recursive sum whose body is an ite."""
+        out = compile_fixture("sum_ite_body.aral")
+        assert "inv-total-matches-active-sum" in out
+        assert "define-fun-rec sum-items" in out
+        # The ite selector must appear inside the recursive body
+        assert "(ite (> (items-active" in out
+
+
+# ============================================================
 # Output structure
 # ============================================================
 

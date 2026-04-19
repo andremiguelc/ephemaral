@@ -306,6 +306,20 @@ class TestSumCompound:
         assert "total_matches_line_totals" in out
 
 
+class TestSumIteBody:
+    def test_sum_with_ite_body_passthrough_verified(self):
+        """Conditional aggregation `sum(items, ite(active > 0, value, 0))`
+        parses through the new item-body ite atom; passthrough preserves the
+        invariant → VERIFIED."""
+        out = _run_and_snapshot(
+            "sum_ite_body.aral-fn.json",
+            "sum_ite_body.aral",
+            "sum_ite_body",
+        )
+        assert "VERIFIED" in out
+        assert "total_matches_active_sum" in out
+
+
 class TestSumMixed:
     def test_sum_plus_scalar_invariants(self):
         """total >= 0 AND total == sum(items, subtotal) — resetTotal violates sum but satisfies >=0."""

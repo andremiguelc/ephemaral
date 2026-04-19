@@ -1,0 +1,7 @@
+{
+  "name": "noop",
+  "inputType": "Order",
+  "inputFields": ["total"],
+  "params": [],
+  "assigns": []
+}
