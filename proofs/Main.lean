@@ -109,7 +109,7 @@ def isAralFnJson (path : String) : Bool :=
 def printUsage : IO Unit :=
   IO.eprintln "Usage: ephemaral [--debug] <function.aral-fn.json> <inv1.aral> [inv2.aral ...]\n       ephemaral <inv.aral> [inv2.aral ...]"
 
-def ephemaralVersion : String := "0.1.2"
+def ephemaralVersion : String := "0.1.3"
 
 def main (args : List String) : IO Unit := do
   -- Version flag
