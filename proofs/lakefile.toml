@@ -1,5 +1,5 @@
 name = "ephemaral"
-version = "0.1.0"
+version = "0.1.2"
 keywords = ["verification", "formal-methods", "business-logic"]
 defaultTargets = ["Proofs"]
 

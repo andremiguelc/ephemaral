@@ -59,6 +59,60 @@ invariant <another_name>:
 
 ---
 
+## Formal Grammar
+
+EBNF-style grammar for `.aral` files. Every production corresponds to a proved construct below.
+
+```ebnf
+(* ─── File structure ─── *)
+file           = { comment | invariant | blank_line } ;
+comment        = "#" , { any_char } , newline ;
+invariant      = "invariant" , name , ":" , newline , indent , expr ;
+name           = letter , { letter | digit | "_" } ;
+
+(* ─── Expressions ─── *)
+expr           = comparison
+               | expr , ( "and" | "or" ) , expr
+               | "if" , root , "." , field , "exists" , ":" , expr
+               | "each" , "(" , root , "." , collection , "," , item_pred , ")"
+               | "sum"  , "(" , root , "." , collection , "," , item_expr , ")"
+               | "transition" , "(" , root , "." , field , ")" , ":" , transition_list ;
+
+comparison     = arith_expr , cmp_op , arith_expr ;
+cmp_op         = ">=" | "<=" | ">" | "<" | "==" | "!=" ;
+
+arith_expr     = term , { ( "+" | "-" ) , term } ;
+term           = factor , { ( "*" | "/" ) , factor } ;
+factor         = number
+               | root , "." , field
+               | "round" , "(" , arith_expr , "," , round_mode , ")"
+               | "(" , arith_expr , ")" ;
+round_mode     = "floor" | "ceil" | "halfUp" ;
+
+(* ─── Collection bodies ─── *)
+item_expr      = item_factor , { ( "+" | "-" | "*" | "/" ) , item_factor } ;
+item_factor    = number | field_name ;
+item_pred      = item_comparison , { ( "and" | "or" ) , item_comparison } ;
+item_comparison = item_expr , cmp_op , item_expr ;
+
+(* ─── Transitions ─── *)
+transition_list = transition_rule , { newline , indent , transition_rule } ;
+transition_rule = state , "->" , state ;
+state          = identifier ;
+
+(* ─── Terminals ─── *)
+root           = identifier ;            (* lowercase of type name *)
+field          = identifier ;
+field_name     = identifier ;            (* bare name, item-scoped *)
+collection     = identifier ;
+number         = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
+identifier     = letter , { letter | digit | "_" } ;
+```
+
+**Key scoping rule:** Inside `sum()` and `each()` bodies, field names are bare (no root prefix). `sum(order.items, quantity * price)` means `item.quantity * item.price` — the collection accessor provides the scope.
+
+---
+
 ## Primitives
 
 | Primitive | Syntax | SMT-LIB | Example |

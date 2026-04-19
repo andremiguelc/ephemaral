@@ -2,175 +2,140 @@
 
 Formally verified business logic verification. Checks that your functions preserve data invariants, with the verification compiler proved correct in Lean 4.
 
-The Lean proofs guarantee that if the function representation is faithful, the verification question sent to Z3 is semantics-preserving.
+## Quick Start
 
-## Install
+### 1. Install
 
-### Prerequisites
+**Z3** (SMT solver): `brew install z3` (macOS) / `apt install z3` (Ubuntu) / [GitHub releases](https://github.com/Z3Prover/z3/releases)
 
-- **Z3** — `brew install z3` (macOS) / `apt install z3` (Ubuntu) / [GitHub releases](https://github.com/Z3Prover/z3/releases) (all platforms)
-
-### Option A: Download a pre-built binary
-
-Grab the latest binary for your platform from [GitHub Releases](https://github.com/andremiguelc/ephemaral/releases/latest) and place it in your project's `.ephemaral/bin/` directory:
+**ephemaral binary**: download from [GitHub Releases](https://github.com/andremiguelc/ephemaral/releases/latest):
 
 ```bash
 mkdir -p .ephemaral/bin
-
 # macOS (Apple Silicon)
 curl -L -o .ephemaral/bin/ephemaral https://github.com/andremiguelc/ephemaral/releases/latest/download/ephemaral-macos-arm64
-
 # Linux (x86_64)
 curl -L -o .ephemaral/bin/ephemaral https://github.com/andremiguelc/ephemaral/releases/latest/download/ephemaral-linux-x86_64
-
 chmod +x .ephemaral/bin/ephemaral
 ```
 
-Add `.ephemaral/bin/` to your `.gitignore`.
+### 2. Write an invariant
 
-### Option B: Build from source
+Create `.ephemaral/rules/record.aral`:
 
-Requires **Lean 4** (v4.28.0) via [elan](https://github.com/leanprover/elan).
+```
+# The computed value must be non-negative
+invariant value_non_negative:
+  record.value >= 0
+
+# The total must equal base plus adjustment
+invariant total_correct:
+  record.total == record.base + record.adjustment
+```
+
+### 3. Run verification
 
 ```bash
-git clone https://github.com/andremiguelc/ephemaral.git
-cd ephemaral/proofs
-lake build ephemaral
-# Binary at: proofs/.lake/build/bin/ephemaral
+# Verify a function against invariants
+.ephemaral/bin/ephemaral .ephemaral/parsed/function.aral-fn.json .ephemaral/rules/record.aral
+
+# Compile invariants to SMT-LIB (inspect what the compiler produces)
+.ephemaral/bin/ephemaral .ephemaral/rules/record.aral
 ```
 
-### The .ephemaral directory
+Output: `VERIFIED` (safe for all inputs) or `COUNTEREXAMPLE FOUND` (with exact failing values and a diagnosis).
 
-When using ephemaral in a project, the `.ephemaral/` directory holds all verification artifacts:
-
-```
-.ephemaral/
-├── bin/
-│   └── ephemaral               # binary (gitignored)
-├── parsed/                     # parser output (gitignored, regenerable)
-│   └── function.aral-fn.json
-└── rules/                      # invariant files (checked in)
-    └── inv1.aral
-```
-
-- **bin/** — the ephemaral binary. Gitignore this.
-- **parsed/** — `.aral-fn.json` files produced by parsers. Gitignore this (regenerable from source).
-- **rules/** — `.aral` invariant files. Check these in — they're your business rules.
-
-## Usage
-
-**Verify a function against invariants:**
-
-```bash
-ephemaral <function.aral-fn.json> <inv1.aral> [inv2.aral ...]
-```
-
-The tool reads a function representation (`.aral-fn.json`) and one or more invariant files (`.aral`). It compiles both into an SMT-LIB query, runs Z3, and reports either `VERIFIED` or a counterexample with exact failing values.
-
-**Compile invariants to SMT-LIB:**
-
-```bash
-ephemaral <inv.aral> [inv2.aral ...]
-```
-
-When given only `.aral` files (no `.aral-fn.json`), outputs the compiled SMT-LIB to stdout.
-
-## Writing invariants
-
-Invariants are written in `.aral` files — a small language for expressing what must always be true about data. The root prefix binds the invariant to a type. The tool checks: if the input satisfies all invariants, does the output also satisfy them?
-
-See [dsl/LANGUAGE.md](dsl/LANGUAGE.md) for the full language specification.
-
-## The Aral-fn format
-
-Functions are represented as `.aral-fn.json` files — a JSON format describing what a function computes. This is the **proof boundary**: everything before it (parsers, LLMs) is unproved. Everything after it (compilation, SMT-LIB generation, verification) is proved correct in Lean 4.
-
-You can produce `.aral-fn.json` files using a deterministic parser (like [ts-to-ephemaral](https://github.com/andremiguelc/ts-to-ephemaral) for TypeScript) or hand-craft them. Any tool that produces valid JSON works.
-
-See [ir/README.md](ir/README.md) for the format specification and [ir/aral-fn.schema.json](ir/aral-fn.schema.json) for the JSON Schema.
-
-## What can it verify?
-
-Supported constructs in function bodies:
-
-- Arithmetic (add, subtract, multiply, divide)
-- Conditional expressions (if-then-else from guard clauses and ternary operators)
-- Division with rounding (floor, ceil, half-up)
-- Typed parameter preconditions (invariants on parameter types applied automatically)
-- Null-safe field access (nullable fields with defaults)
-- Collection sums (reduce-to-sum patterns)
-- Collection predicates (universal quantifier — every item satisfies a condition)
-
-This covers approximately 78% of CRUD functions across 6 surveyed production codebases.
-
-## Architecture
-
-The verification pipeline:
+## How It Works
 
 ```
-Source code  ──→  Parser (unproved)  ──→  Aral-fn JSON
+Source code  ──→  Parser (unproved)  ──→  .aral-fn.json
                                             │
                                      [proof boundary]
                                             │
 .aral files ──→  Invariant compiler ──→  SMT-LIB query  ──→  Z3  ──→  Result
-                  (proved correct)       (proved correct)
+                  (proved in Lean 4)     (proved correct)
 ```
 
-**Inside the proof boundary (machine-checked in Lean 4):**
-- Invariant parser, compiler, and renderer
-- Function compiler and pipeline routing
-- SMT-LIB assembly and format preservation
+Everything below the proof boundary is machine-checked in Lean 4. The Lean proofs guarantee that if the function representation is faithful, the verification question sent to Z3 is semantics-preserving.
 
-**Outside the proof boundary (empirically validated):**
-- Source code parsers (any language)
-- JSON deserialization
-- Z3 solver (trusted external tool)
-- Diagnostic message formatting
+## Writing Invariants
 
-The Lean proofs are in [proofs/Proofs/](proofs/Proofs/).
+Invariants are written in `.aral` files — a small language for expressing what must always be true about data. The root prefix binds the invariant to a type (`record.value` binds to type `Record`).
 
-## Running tests
+**Common patterns:**
+
+```
+# Non-negativity
+invariant value_non_negative:
+  record.value >= 0
+
+# Bounded range
+invariant value_bounded:
+  record.value >= 0 and record.value <= 10000
+
+# Relationship between fields
+invariant total_correct:
+  record.total == record.base + record.adjustment
+
+# Collection sum
+invariant total_matches_items:
+  record.total == sum(record.items, value)
+
+# Per-item constraint
+invariant items_valid:
+  each(record.items, value > 0 and value <= 1000)
+```
+
+See [dsl/LANGUAGE.md](dsl/LANGUAGE.md) for the full language specification and formal grammar.
+
+## The Aral-fn Format
+
+Functions are represented as `.aral-fn.json` files — a JSON format describing what a function computes. This is the **proof boundary**: everything before it (parsers) is unproved, everything after it (compilation, verification) is proved correct in Lean 4.
+
+Produce `.aral-fn.json` files using a language parser (see [ts-to-ephemaral](https://github.com/andremiguelc/ts-to-ephemaral) for TypeScript).
+
+See [ir/README.md](ir/README.md) for the format specification and [ir/aral-fn.schema.json](ir/aral-fn.schema.json) for the JSON Schema.
+
+## Project Setup
+
+```
+.ephemaral/
+├── bin/
+│   └── ephemaral          # binary (gitignored)
+├── parsed/                # .aral-fn.json files (gitignored, regenerable)
+└── rules/                 # .aral invariant files (checked in, one per type)
+    └── <type>.aral
+```
+
+Add to `.gitignore`:
+```
+.ephemaral/bin/
+.ephemaral/parsed/
+```
+
+## Building & Testing
+
+### Build from source
+
+Requires **Lean 4** (v4.28.0) via [elan](https://github.com/leanprover/elan).
 
 ```bash
-# Set up Python environment
+cd proofs && lake build ephemaral
+# Binary at: .lake/build/bin/ephemaral
+```
+
+### Running tests
+
+```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install pytest jsonschema
-
-# Compiler + diagnostic tests
-pytest proofs/tests/ -v
-
-# Schema validation tests
-pytest ir/tests/ -v
+pytest proofs/tests/ -v    # compiler + diagnostics
+pytest ir/tests/ -v        # schema validation
 ```
 
-## CI and Releases
+### CI and releases
 
-### Continuous integration
-
-Every push runs the CI workflow (`.github/workflows/ci.yml`), which builds the full Lean project and confirms all proofs compile with zero sorry's.
-
-### Releasing a new version
-
-Releases are triggered by pushing a version tag. The release workflow (`.github/workflows/release.yml`) builds binaries for Linux x86_64 and macOS arm64 and attaches them to a GitHub Release.
-
-```bash
-# 1. Merge your branch into main
-git checkout main
-git merge <branch>
-
-# 2. Tag the release
-git tag v<version>
-
-# 3. Push (tag triggers the release workflow)
-git push origin main --tags
-```
-
-GitHub Actions will:
-1. Build the `ephemaral` executable on both platforms via `lake build`
-2. Create a GitHub Release with auto-generated release notes
-3. Attach the binaries (`ephemaral-linux-x86_64`, `ephemaral-macos-arm64`)
-
-Users can then download the binary from the [Releases page](https://github.com/andremiguelc/ephemaral/releases).
+Every push runs CI (`.github/workflows/ci.yml`) — builds the Lean project and confirms all proofs compile with zero sorry's. Releases are triggered by pushing a version tag (`git tag v<version> && git push --tags`).
 
 ## License
 
