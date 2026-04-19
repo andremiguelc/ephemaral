@@ -1,0 +1,3 @@
+# Total stays non-negative through the ite+each construct.
+invariant total_non_negative:
+  order.total >= 0

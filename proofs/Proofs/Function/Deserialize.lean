@@ -156,7 +156,15 @@ mutual
         | .error _ => .ok (.isPresent (.simple name))
       | .error _ => .error s!"isPresent object must have a \"name\" key, got {fieldVal}"
     | .error _ =>
-    .error s!"expected BoolExpr (cmp, logic, not, or isPresent), got {j}"
+    -- Try each
+    match j.getObjVal? "each" with
+    | .ok eachObj => do
+      let collName ← eachObj.getObjValAs? String "collection"
+      let bodyJson ← eachObj.getObjVal? "body"
+      let body ← boolExprFromJson bodyJson
+      return .eachExpr (.simple collName) body
+    | .error _ =>
+    .error s!"expected BoolExpr (cmp, logic, not, isPresent, or each), got {j}"
 end
 
 instance : FromJson Expr where
