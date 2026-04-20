@@ -1,9 +1,10 @@
 # Changelog
 
-## 0.1.3
+## 0.1.4
 
 Closes two non-breaking gaps where a construct's proof and IR support
-already existed but a surface layer blocked users from reaching it.
+already existed but a surface layer blocked users from reaching it, plus
+an internal proof refactor.
 
 - **`each` accepted in Function JSON**. `boolExprFromJson` now recognizes
   `{"each": {"collection": ..., "body": ...}}`. The compiler, renderer,
@@ -29,6 +30,12 @@ already existed but a surface layer blocked users from reaching it.
 - **Parser internals**: `parseSumExpr` now finds its matching close paren
   with depth-aware tracking, so nested constructs inside a sum body do
   not truncate the body.
+
+- **Proof refactor**: the `sumExpr` and `eachExpr` cases of the function
+  correctness proof now share a single `funEnv_collection_bridge` lemma
+  instead of duplicating the four-step environment bridge. No change to
+  any theorem signature; prepares the proof for future collection
+  constructs (`pairwise`, `max`/`min`).
 
 IR schema (`aralFnVersion`) remains at 0.1.2 — no schema change.
 
