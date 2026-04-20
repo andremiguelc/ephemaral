@@ -58,7 +58,7 @@ The formal JSON Schema is at `aral-fn.schema.json`.
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string | Function name (for diagnostics) |
-| `inputType` | string | The type being transformed (matched against invariant root) |
+| `inputType` | string | The type being transformed (matched against the invariant's type-binding prefix) |
 | `inputFields` | string[] | Fields on the type relevant to verification |
 | `params` | string[] | Extra parameters (free variables in verification) |
 | `assigns` | FieldAssign[] | Which fields change and to what expression |

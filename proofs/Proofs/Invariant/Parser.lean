@@ -82,43 +82,123 @@ def findRightmostOp (tokens : List String) (ops : List String) : Option Nat :=
       go (i + 1) newDepth newBest
   go 0 0 none
 
+/-- Find the index of a comparison operator in item-scoped tokens. -/
+def findItemCompOpIdx (tokens : List String) : Option Nat :=
+  tokens.findIdx? fun t => compOpTokens.contains t
+
+/-- Find the close paren matching the open paren at `tokens[0]`.
+    `tokens[0]` must be `"("`. Returns the index of the matching `")"`
+    (at depth 0 after the opener is consumed). -/
+partial def findMatchingClose (tokens : List String) : Option Nat :=
+  let rec go (rest : List String) (i depth : Nat) : Option Nat :=
+    match rest with
+    | [] => none
+    | t :: ts =>
+      if t == "(" then go ts (i + 1) (depth + 1)
+      else if t == ")" then
+        if depth == 1 then some i
+        else go ts (i + 1) (depth - 1)
+      else go ts (i + 1) depth
+  go tokens 0 0
+
 -- Parse an expression over item fields (bare names, no root prefix).
--- Recursive descent with operator precedence. Termination: every recursive
--- call is on a strictly shorter token sublist (via List.take / List.drop).
+-- Recursive descent with operator precedence. Item-body parsers are `partial`
+-- (matching the original standalone `parseItemBoolExpr`) — no downstream
+-- correctness proof depends on their termination, and the new `ite` atom
+-- calls back into `parseItemBodyExpr` on structurally shorter sub-slices.
 mutual
-  def parseItemBodyExpr (tokens : List String) : Option Expr := do
+  /-- Find the two top-level commas and matching close paren of an
+      `ite(c, t, e)` argument list. `tokens` starts at the opening "(".
+      Returns `(comma1, comma2, close)` as 0-based indices into `tokens`. -/
+  partial def findIteArgs (tokens : List String) : Option (Nat × Nat × Nat) :=
+    let rec go (rest : List String) (i depth : Nat) (c1 c2 : Option Nat)
+        : Option (Nat × Nat × Nat) :=
+      match rest with
+      | [] => none
+      | t :: ts =>
+        if t == "(" then go ts (i + 1) (depth + 1) c1 c2
+        else if t == ")" then
+          if depth == 1 then
+            match c1, c2 with
+            | some a, some b => some (a, b, i)
+            | _, _ => none
+          else go ts (i + 1) (depth - 1) c1 c2
+        else if t == "," && depth == 1 then
+          match c1 with
+          | none => go ts (i + 1) depth (some i) c2
+          | some _ =>
+            match c2 with
+            | none => go ts (i + 1) depth c1 (some i)
+            | some _ => go ts (i + 1) depth c1 c2
+        else go ts (i + 1) depth c1 c2
+    go tokens 0 0 none none
+
+  /-- Parse an `ite(cond, then, else)` atom in item-body scope.
+      `tokens` starts with the opening "(" after the `ite` keyword. -/
+  partial def parseItemIteAtom (tokens : List String) : Option Expr := do
+    guard (tokens.length >= 7)  -- ( c , t , e )
+    guard (tokens[0]! == "(")
+    let (c1, c2, closeIdx) ← findIteArgs tokens
+    guard (c1 > 1 && c2 > c1 + 1 && closeIdx > c2 + 1)
+    let condToks := tokens.toArray[1:c1].toArray.toList
+    let thenToks := tokens.toArray[c1 + 1 : c2].toArray.toList
+    let elseToks := tokens.toArray[c2 + 1 : closeIdx].toArray.toList
+    let cond ← parseItemBoolExpr condToks
+    let thenE ← parseItemBodyExpr thenToks
+    let elseE ← parseItemBodyExpr elseToks
+    pure (.condExpr cond thenE elseE)
+
+  partial def parseItemBodyExpr (tokens : List String) : Option Expr := do
     guard (!tokens.isEmpty)
     match findRightmostOp tokens ["+", "-"] with
     | some idx =>
-      if _h_pos : idx > 0 then
-        if h_bound : idx + 1 < tokens.length then
-          let left ← parseItemBodyExpr (tokens.take idx)
-          let right ← parseItemBodyTerm (tokens.drop (idx + 1))
-          let op := if tokens[idx]! == "+" then ArithOp.add else ArithOp.sub
-          pure (.arith op left right)
-        else none
+      if idx > 0 && idx + 1 < tokens.length then
+        let left ← parseItemBodyExpr (tokens.take idx)
+        let right ← parseItemBodyTerm (tokens.drop (idx + 1))
+        let op := if tokens[idx]! == "+" then ArithOp.add else ArithOp.sub
+        pure (.arith op left right)
       else none
     | none => parseItemBodyTerm tokens
-  termination_by tokens.length
-  decreasing_by all_goals simp [List.length_take]; omega
 
-  def parseItemBodyTerm (tokens : List String) : Option Expr := do
+  partial def parseItemBodyTerm (tokens : List String) : Option Expr := do
     match findRightmostOp tokens ["*", "/"] with
     | some idx =>
-      if _h_pos : idx > 0 then
-        if h_bound : idx + 1 < tokens.length then
-          let left ← parseItemBodyTerm (tokens.take idx)
-          let right ← parseItemExpr tokens[idx + 1]!
-          let op := if tokens[idx]! == "*" then ArithOp.mul else ArithOp.div
-          pure (.arith op left right)
-        else none
+      if idx > 0 && idx + 1 < tokens.length then
+        let left ← parseItemBodyTerm (tokens.take idx)
+        let right ← parseItemExpr tokens[idx + 1]!
+        let op := if tokens[idx]! == "*" then ArithOp.mul else ArithOp.div
+        pure (.arith op left right)
       else none
     | none =>
       match tokens with
+      | "ite" :: rest => parseItemIteAtom rest
       | [t] => parseItemExpr t
       | _ => none
-  termination_by tokens.length
-  decreasing_by all_goals simp [List.length_take]; omega
+
+  /-- Parse a boolean expression over item fields.
+      Splits on `and`/`or` connectives, then parses each half as a comparison.
+      Item fields are bare names (no root prefix). -/
+  partial def parseItemBoolExpr (tokens : List String) : Option BoolExpr := do
+    match tokens.findIdx? (· == "and") with
+    | some idx =>
+      let left ← parseItemCmpExpr (tokens.take idx)
+      let right ← parseItemBoolExpr (tokens.drop (idx + 1))
+      pure (.logic .and left right)
+    | none =>
+      match tokens.findIdx? (· == "or") with
+      | some idx =>
+        let left ← parseItemCmpExpr (tokens.take idx)
+        let right ← parseItemBoolExpr (tokens.drop (idx + 1))
+        pure (.logic .or left right)
+      | none => parseItemCmpExpr tokens
+
+  /-- Parse a comparison over item fields (bare names, no root prefix). -/
+  partial def parseItemCmpExpr (tokens : List String) : Option BoolExpr := do
+    let opIdx ← findItemCompOpIdx tokens
+    let op ← parseOp tokens[opIdx]!
+    let lhs ← parseItemBodyExpr (tokens.take opIdx)
+    let rhs ← parseItemBodyExpr (tokens.drop (opIdx + 1))
+    pure (.cmp op lhs rhs)
 end
 
 /-- Parse a sum expression from tokens starting after "sum".
@@ -128,10 +208,13 @@ def parseSumExpr (tokens : List String) (root : String) : Option (Expr × Nat) :
   -- tokens[0] should be "("
   guard (tokens.length >= 5)  -- at minimum: ( coll , field )
   guard (tokens[0]! == "(")
-  -- Find the comma
+  -- Find the separator comma (depth-1) and matching close paren (depth-0).
+  -- The first comma in the token stream is at depth 1 for well-formed sum
+  -- (collection has no commas), so `findIdx?` is fine for the comma. The close
+  -- paren must be found depth-aware so nested constructs (e.g. `ite`) don't
+  -- truncate the body.
   let commaIdx ← tokens.findIdx? (· == ",")
-  -- Find the closing paren
-  let closeIdx ← tokens.findIdx? (· == ")")
+  let closeIdx ← findMatchingClose tokens
   guard (closeIdx > commaIdx)
   -- Parse collection: tokens between ( and ,
   let collTokens := tokens.toArray[1:commaIdx].toArray.toList
@@ -214,35 +297,6 @@ def parseCmpExpr (tokens : List String) (root : String) : Option BoolExpr := do
   let lhs ← parseExpr lhsTokens root
   let rhs ← parseExpr rhsTokens root
   pure (.cmp op lhs rhs)
-
-/-- Find the index of a comparison operator in item-scoped tokens. -/
-def findItemCompOpIdx (tokens : List String) : Option Nat :=
-  tokens.findIdx? fun t => compOpTokens.contains t
-
-/-- Parse a comparison over item fields (bare names, no root prefix). -/
-def parseItemCmpExpr (tokens : List String) : Option BoolExpr := do
-  let opIdx ← findItemCompOpIdx tokens
-  let op ← parseOp tokens[opIdx]!
-  let lhs ← parseItemBodyExpr (tokens.take opIdx)
-  let rhs ← parseItemBodyExpr (tokens.drop (opIdx + 1))
-  pure (.cmp op lhs rhs)
-
-/-- Parse a boolean expression over item fields.
-    Splits on `and`/`or` connectives, then parses each half as a comparison.
-    Item fields are bare names (no root prefix). -/
-partial def parseItemBoolExpr (tokens : List String) : Option BoolExpr := do
-  match tokens.findIdx? (· == "and") with
-  | some idx =>
-    let left ← parseItemCmpExpr (tokens.take idx)
-    let right ← parseItemBoolExpr (tokens.drop (idx + 1))
-    pure (.logic .and left right)
-  | none =>
-    match tokens.findIdx? (· == "or") with
-    | some idx =>
-      let left ← parseItemCmpExpr (tokens.take idx)
-      let right ← parseItemBoolExpr (tokens.drop (idx + 1))
-      pure (.logic .or left right)
-    | none => parseItemCmpExpr tokens
 
 /-- Parse an each expression from tokens starting after "each".
     Expects: "(" collection "," body-bool-tokens ")"

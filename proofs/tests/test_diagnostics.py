@@ -52,6 +52,20 @@ class TestVerified:
         assert "VERIFIED" in out
         assert "(verified_guarded_sub.aral)" in out  # ESLint-style source ref
 
+    def test_each_in_ite_cond_deserializes(self):
+        """Function assigns total via ite(each(...), subtotal, 0). The `each`
+        arm in boolExprFromJson must accept the cond; both ite branches
+        preserve non-negativity → VERIFIED."""
+        out = _run_and_snapshot(
+            "each_in_ite_cond_verified.aral-fn.json",
+            ["each_in_ite_cond_total.aral", "each_in_ite_cond_subtotal.aral"],
+            "each_in_ite_cond_verified",
+        )
+        assert "VERIFIED" in out
+        assert "total_non_negative" in out
+        # Guard against regression of the pre-0.1.3 reader error
+        assert "expected BoolExpr" not in out
+
 
 # ============================================================
 # UNCONSTRAINED_PARAMETER
@@ -290,6 +304,20 @@ class TestSumCompound:
         )
         assert "VERIFIED" in out
         assert "total_matches_line_totals" in out
+
+
+class TestSumIteBody:
+    def test_sum_with_ite_body_passthrough_verified(self):
+        """Conditional aggregation `sum(items, ite(active > 0, value, 0))`
+        parses through the new item-body ite atom; passthrough preserves the
+        invariant → VERIFIED."""
+        out = _run_and_snapshot(
+            "sum_ite_body.aral-fn.json",
+            "sum_ite_body.aral",
+            "sum_ite_body",
+        )
+        assert "VERIFIED" in out
+        assert "total_matches_active_sum" in out
 
 
 class TestSumMixed:

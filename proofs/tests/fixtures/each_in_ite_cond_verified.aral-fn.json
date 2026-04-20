@@ -1,0 +1,29 @@
+{
+  "name": "markIfAllPositive",
+  "inputType": "Order",
+  "inputFields": ["total", "subtotal"],
+  "params": [],
+  "assigns": [
+    {
+      "fieldName": "total",
+      "value": {
+        "ite": {
+          "cond": {
+            "each": {
+              "collection": "lineItems",
+              "body": {
+                "cmp": {
+                  "op": "gt",
+                  "left": {"field": {"name": "quantity"}},
+                  "right": {"lit": 0}
+                }
+              }
+            }
+          },
+          "then": {"field": {"name": "subtotal"}},
+          "else": {"lit": 0}
+        }
+      }
+    }
+  ]
+}

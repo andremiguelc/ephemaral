@@ -60,7 +60,7 @@ Everything below the proof boundary is machine-checked in Lean 4. The Lean proof
 
 ## Writing Invariants
 
-Invariants are written in `.aral` files — a small language for expressing what must always be true about data. The root prefix binds the invariant to a type (`record.value` binds to type `Record`).
+Invariants are written in `.aral` files — a small language for expressing what must always be true about data. The identifier before the dot binds the invariant to a type (`record.value` binds to type `Record`).
 
 **Common patterns:**
 

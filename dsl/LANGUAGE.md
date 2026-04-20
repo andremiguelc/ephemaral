@@ -31,7 +31,7 @@ Here `record` is not a specific variable — it means "any value of type `Record
 
 The invariant compiler produces the constraint shape: `(>= amount 0.0)`. The function encoder produces `in-amount` and `out-amount` constants from the function's type signature, and plugs the invariant constraint into both sides.
 
-**The root prefix is the type binding.** The root (`record` in `record.amount`) is the type name, matched case-insensitively to the function's input/output type. Convention: the root should be the lowercase of the type name (`record` for `Record`, `entry` for `Entry`). The pipeline validates this match and warns on mismatch, but proceeds — the field-level overlap filter handles the actual matching.
+**The prefix before the dot is the type binding.** In `record.amount`, `record` is the type name, matched case-insensitively to the function's input/output type. Convention: use the lowercase of the type name (`record` for `Record`, `order` for `Order`, `entry` for `Entry`). The pipeline validates this match and warns on mismatch, but proceeds — the field-level overlap filter handles the actual matching. In grammar and schema text below, `<type>` stands for this identifier — it is a placeholder, not a literal keyword.
 
 **Field names are the contract.** If the invariant says `record.amount` but the type has `Record.value`, nothing connects. The binding fails at compile time — before verification starts.
 
@@ -73,10 +73,10 @@ name           = letter , { letter | digit | "_" } ;
 (* ─── Expressions ─── *)
 expr           = comparison
                | expr , ( "and" | "or" ) , expr
-               | "if" , root , "." , field , "exists" , ":" , expr
-               | "each" , "(" , root , "." , collection , "," , item_pred , ")"
-               | "sum"  , "(" , root , "." , collection , "," , item_expr , ")"
-               | "transition" , "(" , root , "." , field , ")" , ":" , transition_list ;
+               | "if" , type , "." , field , "exists" , ":" , expr
+               | "each" , "(" , type , "." , collection , "," , item_pred , ")"
+               | "sum"  , "(" , type , "." , collection , "," , item_expr , ")"
+               | "transition" , "(" , type , "." , field , ")" , ":" , transition_list ;
 
 comparison     = arith_expr , cmp_op , arith_expr ;
 cmp_op         = ">=" | "<=" | ">" | "<" | "==" | "!=" ;
@@ -84,7 +84,7 @@ cmp_op         = ">=" | "<=" | ">" | "<" | "==" | "!=" ;
 arith_expr     = term , { ( "+" | "-" ) , term } ;
 term           = factor , { ( "*" | "/" ) , factor } ;
 factor         = number
-               | root , "." , field
+               | type , "." , field
                | "round" , "(" , arith_expr , "," , round_mode , ")"
                | "(" , arith_expr , ")" ;
 round_mode     = "floor" | "ceil" | "halfUp" ;
@@ -101,7 +101,7 @@ transition_rule = state , "->" , state ;
 state          = identifier ;
 
 (* ─── Terminals ─── *)
-root           = identifier ;            (* lowercase of type name *)
+type           = identifier ;            (* lowercase of the bound type *)
 field          = identifier ;
 field_name     = identifier ;            (* bare name, item-scoped *)
 collection     = identifier ;
@@ -109,7 +109,7 @@ number         = [ "-" ] , digit , { digit } , [ "." , digit , { digit } ] ;
 identifier     = letter , { letter | digit | "_" } ;
 ```
 
-**Key scoping rule:** Inside `sum()` and `each()` bodies, field names are bare (no root prefix). `sum(order.items, quantity * price)` means `item.quantity * item.price` — the collection accessor provides the scope.
+**Key scoping rule:** Inside `sum()` and `each()` bodies, field names are bare (no type prefix). `sum(order.items, quantity * price)` means `item.quantity * item.price` — the collection accessor provides the scope.
 
 ---
 
@@ -117,7 +117,7 @@ identifier     = letter , { letter | digit | "_" } ;
 
 | Primitive | Syntax | SMT-LIB | Example |
 |-----------|--------|---------|---------|
-| Field reference | `<root>.<field>` | Root stripped, field becomes `(declare-const field Real)` | `record.amount` |
+| Field reference | `<type>.<field>` | Type prefix stripped, field becomes `(declare-const field Real)` | `record.amount` |
 | Numeric literal | `0`, `100`, `-5` | Real literal with `.0` suffix | `100` → `100.0` |
 | Comparisons | `==` `!=` `>` `<` `>=` `<=` | Direct mapping (`!=` → `(not (= ...))`) | `record.amount >= 0` |
 
@@ -276,7 +276,7 @@ The `optionalFields` array on `FunctionRepr` tells the pipeline which fields are
 Sum a per-item expression across all items in a collection. Two arguments: the collection, and the per-item expression.
 
 ```
-sum(<root>.<collection>, <per-item expression>)
+sum(<type>.<collection>, <per-item expression>)
 ```
 
 ```
@@ -317,7 +317,7 @@ No hardcoded bound — the collection length is symbolic. Z3 explores different 
 Assert that a boolean predicate holds for every item in a collection. The boolean analog of `sum` — same recursion scheme, same item environment, different algebra (`Bool/∧/true` instead of `Rat/+/0`).
 
 ```
-each(<root>.<collection>, <per-item predicate>)
+each(<type>.<collection>, <per-item predicate>)
 ```
 
 ```

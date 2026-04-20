@@ -1,0 +1,3 @@
+# Conditional aggregation: sum only values where active is positive.
+invariant total_matches_active_sum:
+  order.total == sum(order.items, ite(active > 0, value, 0))

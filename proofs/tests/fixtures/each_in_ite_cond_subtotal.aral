@@ -1,0 +1,3 @@
+# Precondition: subtotal is non-negative on input.
+invariant subtotal_non_negative:
+  order.subtotal >= 0
