@@ -36,11 +36,11 @@ invariant total_correct:
 ### 3. Run verification
 
 ```bash
-# Verify a function against invariants
-.ephemaral/bin/ephemaral .ephemaral/parsed/function.aral-fn.json .ephemaral/rules/record.aral
+# Verify a parsed expression against invariants
+.ephemaral/bin/ephemaral .ephemaral/parsed/<aral-name>/<site>.aral-fn.json .ephemaral/rules/<aral-name>.aral
 
 # Compile invariants to SMT-LIB (inspect what the compiler produces)
-.ephemaral/bin/ephemaral .ephemaral/rules/record.aral
+.ephemaral/bin/ephemaral .ephemaral/rules/<aral-name>.aral
 ```
 
 Output: `VERIFIED` (safe for all inputs) or `COUNTEREXAMPLE FOUND` (with exact failing values and a diagnosis).
