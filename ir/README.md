@@ -4,7 +4,7 @@ Aral-fn is the JSON format for describing function behavior to the ephemaral ver
 
 ## What it describes
 
-A pure data transformation: a function that takes a typed input (plus optional parameters) and returns the same type with some fields changed via spread-and-override.
+A pure data transformation: a function that takes a typed input (plus optional parameters) and returns a value of the same type. Each output field is either explicitly assigned by an expression (listed in `assigns`) or preserved unchanged from the input (every field not listed).
 
 ```typescript
 function adjustValue(record: Record, delta: number): Record {
@@ -108,7 +108,7 @@ Comparison operators: `"eq"` (==), `"neq"` (!=), `"gt"` (>), `"lt"` (<), `"gte"`
 
 ## How fields work
 
-Fields not listed in `assigns` are preserved by the spread operator. If the input has fields `[value, label]` and only `value` is assigned, the output's `label` equals the input's `label` automatically.
+Fields not listed in `assigns` are preserved from the input by default. If the input has fields `[value, label]` and only `value` is assigned, the output's `label` equals the input's `label` automatically.
 
 `inputFields` should include all fields that:
 - Are assigned in `assigns`
