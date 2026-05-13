@@ -20,6 +20,15 @@ structure TypedParam where
   type : String   -- type name (e.g., "ScaledAmount")
   deriving Repr
 
+/-- A per-parameter precondition extracted by the parser from in-function
+    constraint sources (e.g., a recognized Assert call). Each predicate is
+    asserted as a precondition by the verifier, so the parameter is excluded
+    from UNCONSTRAINED_PARAMETER diagnostics. -/
+structure ParamPrecondition where
+  name       : String         -- parameter name (must also appear in FunctionRepr.params)
+  predicates : List BoolExpr  -- predicates the parameter satisfies on entry
+  deriving Repr
+
 /-- The proof boundary for function encoding. Produced by any language parser (via JSON),
     consumed by compileFun. Captures: input type, its fields, extra params, and which
     fields the function changes (spread + override pattern). -/
@@ -31,4 +40,5 @@ structure FunctionRepr where
   assigns     : List FieldAssign -- which fields change and to what expression
   typedParams    : List TypedParam := []  -- typed parameters for cross-type invariant routing
   optionalFields : List String := []     -- nullable fields: pipeline generates has-{field} presence flags
+  paramPreconditions : List ParamPrecondition := []  -- parser-extracted per-parameter preconditions
   deriving Repr

@@ -190,6 +190,16 @@ def typedParamFromJson (j : Json) : Except String TypedParam := do
 instance : FromJson TypedParam where
   fromJson? := typedParamFromJson
 
+/-- Parse a ParamPrecondition from JSON.
+    `{"name": "x", "predicates": [<BoolExpr>, ...]}` -/
+def paramPreconditionFromJson (j : Json) : Except String ParamPrecondition := do
+  let name ← j.getObjValAs? String "name"
+  let predicates ← j.getObjValAs? (List BoolExpr) "predicates"
+  return ⟨name, predicates⟩
+
+instance : FromJson ParamPrecondition where
+  fromJson? := paramPreconditionFromJson
+
 /-- Parse a FunctionRepr from JSON (the Aral-fn format). -/
 instance : FromJson FunctionRepr where
   fromJson? j := do
@@ -208,7 +218,13 @@ instance : FromJson FunctionRepr where
       match j.getObjValAs? (List String) "optionalFields" with
       | Except.ok fs => fs
       | Except.error _ => []
-    return ⟨name, inputType, inputFields, params, assigns, typedParams, optionalFields⟩
+    -- paramPreconditions is optional, defaults to []
+    let paramPreconditions : List ParamPrecondition :=
+      match j.getObjValAs? (List ParamPrecondition) "paramPreconditions" with
+      | Except.ok ps => ps
+      | Except.error _ => []
+    return ⟨name, inputType, inputFields, params, assigns,
+            typedParams, optionalFields, paramPreconditions⟩
 
 mutual
   /-- Collect all field references in an Expr (as resolved keys). -/
@@ -289,6 +305,15 @@ def validateFunctionRepr (f : FunctionRepr) : Except String FunctionRepr := do
     for ref in refs do
       unless knownNames.contains ref do
         .error s!"in assignment to '{a.fieldName}': found '{a.fieldName}: {ref}' but '{ref}' is not a known input or parameter. If this is a local variable, the parser couldn't resolve its declaration. Known: inputFields={f.inputFields}, params={f.params}"
+  -- Check paramPreconditions: each name is a real param, each predicate's refs resolve
+  for pp in f.paramPreconditions do
+    unless f.params.contains pp.name do
+      .error s!"paramPrecondition for '{pp.name}' but '{pp.name}' is not in params {f.params}"
+    for pred in pp.predicates do
+      let refs := collectBoolExprFields pred
+      for ref in refs do
+        unless knownNames.contains ref do
+          .error s!"in paramPrecondition for '{pp.name}': found reference to '{ref}' but '{ref}' is not a known input or parameter. Known: inputFields={f.inputFields}, params={f.params}"
   .ok f
 
 /-- Read, parse, and validate an Aral-fn JSON file into a FunctionRepr. -/

@@ -64,6 +64,7 @@ The formal JSON Schema is at `aral-fn.schema.json`.
 | `assigns` | FieldAssign[] | Which fields change and to what expression |
 | `typedParams` | TypedParam[]? | Typed parameters for cross-type invariant routing |
 | `optionalFields` | string[]? | Nullable fields — pipeline generates `has-{field}` presence constants |
+| `paramPreconditions` | ParamPrecondition[]? | Per-parameter predicates extracted by the parser from in-function constraint sources. The verifier asserts each predicate as a precondition, dropping the parameter from `UNCONSTRAINED_PARAMETER` diagnostics. |
 
 ### FieldAssign
 
@@ -105,6 +106,32 @@ Boolean expressions are used as conditions in `ite`. Four variants:
 | Presence | `{"isPresent": {"name": "x"}}` | `{"isPresent": {"name": "bonus"}}` | nullable field presence check |
 
 Comparison operators: `"eq"` (==), `"neq"` (!=), `"gt"` (>), `"lt"` (<), `"gte"` (>=), `"lte"` (<=).
+
+### ParamPrecondition
+
+Per-parameter preconditions extracted by a parser from in-function constraint sources (e.g., a recognized Assert call). Each entry names a parameter and the boolean predicates it satisfies on entry.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Parameter name. Must also appear in `params`. |
+| `predicates` | BoolExpr[] | Predicates the parameter is known to satisfy. Each is asserted conjunctively before postcondition checking. Field references inside resolve to the parameter name itself when the predicate is on a scalar param. |
+
+```json
+"paramPreconditions": [
+  {
+    "name": "newValue",
+    "predicates": [
+      {
+        "not": {
+          "cmp": { "op": "lt", "left": { "field": { "name": "newValue" } }, "right": { "lit": 0 } }
+        }
+      }
+    ]
+  }
+]
+```
+
+The example above expresses `not (newValue < 0)` — i.e., `newValue >= 0` for every caller that reaches the assignment. Parsers typically encode this as the *negation* of the failure shape they recognized in source (e.g. an `if (newValue < 0) throw` is shipped as `not (newValue < 0)` because callers past the throw satisfy the negation).
 
 ## How fields work
 

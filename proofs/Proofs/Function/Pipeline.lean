@@ -282,7 +282,19 @@ def verifyFunction (funRepr : FunctionRepr) (invariantBlocks : List String)
   -- Filter and route parameter preconditions:
   --   Scalar params: invariant field name = param name (no prefix needed)
   --   Object params: invariant field prefixed with "{paramName}-" matches a param constant
-  let relevantParamFrags := resolveParamPreconditions funRepr paramPrecondFrags
+  let typedParamFrags := resolveParamPreconditions funRepr paramPrecondFrags
+
+  -- Compile parser-supplied per-parameter preconditions (e.g., from recognized
+  -- Assert calls). These come pre-structured as BoolExpr trees from the parser,
+  -- so they bypass the .aral text pipeline and compile directly.
+  let parserParamFrags := funRepr.paramPreconditions.flatMap fun pp =>
+    pp.predicates.map fun pred =>
+      { consts  := (collectFieldsBool pred).eraseDups
+      , body    := compileInvBoolExpr pred
+      , invName := "assert-" ++ pp.name
+      : CompiledInvariant }
+
+  let relevantParamFrags := typedParamFrags ++ parserParamFrags
 
   if relevantFrags.isEmpty && relevantParamFrags.isEmpty then
     let hint := match combinedWarning with
